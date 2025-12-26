@@ -10,6 +10,7 @@ cp deploy/env.example deploy/env
 
 Edit `deploy/env` and set passwords, domains, and IPs.
 If you run OpenEMR with docker compose, set `OPENEMR_BASE_URL=http://openemr` so the backend can reach it on the internal network.
+Use `OPENEMR_SITE_ADDR` and `OPENEMR_REDIRECT_URI` for your public OpenEMR URL.
 
 ## 2) Start the app (frontend + backend + mongo)
 
@@ -31,6 +32,9 @@ OpenEMR will be available on `http://YOUR_HOST:${OPENEMR_PORT}`.
 Enable REST API + OAuth password grant and create a client:
 
 ```bash
+# Optional helper script (reads deploy/env)
+./deploy/openemr-init.sh
+
 # Enable REST API + password grant + site address
 sudo docker exec santia-openemr-mysql mysql -uroot -p${OPENEMR_MYSQL_ROOT_PASSWORD} -e \
 "UPDATE globals SET gl_value='1' WHERE gl_name IN ('rest_api','oauth_password_grant'); \
@@ -71,3 +75,17 @@ docker compose --env-file deploy/env \
 - The backend reads env variables from the container env (no .env file needed inside the image).
 - Update `OPENEMR_BASE_URL` and `JITSI_BASE_URL` to your public domains in production.
 - For OpenEMR production, prefer OAuth Authorization Code Grant instead of password grant.
+
+## Reverse proxy (Nginx + HTTPS)
+1) Point your DNS to the server: `santia.example.com`, `api.santia.example.com`, `emr.santia.example.com`, `meet.santia.example.com`.
+2) Copy `deploy/nginx/santia.conf` to `/etc/nginx/sites-available/santia.conf` and replace the domains.
+3) Enable it and reload Nginx:
+
+```bash
+sudo ln -s /etc/nginx/sites-available/santia.conf /etc/nginx/sites-enabled/santia.conf
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+4) Add HTTPS (certbot or your preferred TLS setup).
+5) Open firewall ports: 80/tcp, 443/tcp, and 10000/udp (Jitsi).
