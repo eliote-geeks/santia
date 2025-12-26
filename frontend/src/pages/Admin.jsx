@@ -14,6 +14,12 @@ const statusTone = {
   done: 'bg-slate-200 text-slate-700'
 };
 
+const statusLabel = {
+  pending: 'En attente',
+  scheduled: 'Planifiee',
+  done: 'Terminee'
+};
+
 const formatDateTime = (value) => {
   if (!value) return 'A planifier';
   const date = new Date(value);
@@ -125,7 +131,7 @@ export const Admin = () => {
                       <div className="flex items-center gap-3">
                         <h2 className="text-lg font-semibold text-[#0A2540]">{intake.name}</h2>
                         <span className={`text-xs font-semibold px-3 py-1 rounded-full ${statusTone[intake.status] || statusTone.pending}`}>
-                          {intake.status || 'pending'}
+                          {statusLabel[intake.status] || statusLabel.pending}
                         </span>
                       </div>
                       <p className="text-sm text-[#64748B]">{intake.category} • {intake.city}</p>
