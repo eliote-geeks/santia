@@ -1,10 +1,14 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
-import { CheckCircle2, ArrowRight, Phone, Clock, MessageSquare } from 'lucide-react';
+import { CheckCircle2, ArrowRight, Phone, Clock, MessageSquare, FileText } from 'lucide-react';
 import { Button } from '../components/ui/button';
 
 export const Confirmation = () => {
+  const location = useLocation();
+  const intakeId = location.state?.intakeId || localStorage.getItem('santia_intake_id');
+  const dossierPath = intakeId ? `/dossier/${intakeId}` : null;
+
   return (
     <div className="min-h-screen bg-[#F8FAFC]" data-testid="confirmation-page">
       <Navbar />
@@ -54,6 +58,26 @@ export const Confirmation = () => {
                 <p className="text-xs text-[#64748B]">Par email si besoin</p>
               </div>
             </div>
+
+            {/* Patient Profile Link */}
+            {dossierPath && (
+              <div className="bg-[#0A2540]/5 border border-[#0A2540]/10 rounded-2xl p-5 mb-8 animate-fade-in-up stagger-4">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-[#0A2540]/10 rounded-full flex items-center justify-center">
+                      <FileText className="w-5 h-5 text-[#0A2540]" />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-sm text-[#64748B]">Votre dossier patient</p>
+                      <p className="text-sm font-medium text-[#0A2540]">Suivez le statut et le lien de consultation</p>
+                    </div>
+                  </div>
+                  <Link to={dossierPath} data-testid="profile-link">
+                    <Button className="btn-green px-6 py-3">Voir mon dossier</Button>
+                  </Link>
+                </div>
+              </div>
+            )}
 
             {/* Image */}
             <div className="rounded-2xl overflow-hidden mb-8 animate-fade-in-up stagger-5" data-testid="confirmation-image">

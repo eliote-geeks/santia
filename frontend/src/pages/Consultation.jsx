@@ -143,8 +143,12 @@ export const Consultation = () => {
         consent: formData.consent
       };
 
-      await axios.post(`${API_URL}/api/intake`, payload);
-      navigate('/confirmation');
+      const response = await axios.post(`${API_URL}/api/intake`, payload);
+      const intakeId = response?.data?.id;
+      if (intakeId) {
+        localStorage.setItem('santia_intake_id', intakeId);
+      }
+      navigate('/confirmation', { state: { intakeId } });
     } catch (error) {
       console.error('Erreur lors de la soumission:', error);
       setErrors({ submit: 'Une erreur est survenue. Veuillez réessayer.' });
