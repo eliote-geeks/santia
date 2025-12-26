@@ -4,6 +4,7 @@ import axios from 'axios';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { Button } from '../components/ui/button';
+import { Textarea } from '../components/ui/textarea';
 import {
   Calendar,
   Clock,
@@ -52,6 +53,14 @@ export const PatientProfile = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [chatMessages, setChatMessages] = useState(() => ([
+    {
+      id: 'welcome',
+      role: 'assistant',
+      content: 'Bonjour, je suis l assistant Santia. Decrivez votre besoin et vos disponibilites.'
+    }
+  ]));
 
   useEffect(() => {
     const fetchIntake = async () => {
@@ -77,6 +86,18 @@ export const PatientProfile = () => {
     } catch (err) {
       setCopied(false);
     }
+  };
+
+  const handleSendMessage = () => {
+    const trimmed = chatInput.trim();
+    if (!trimmed) return;
+    const message = {
+      id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+      role: 'patient',
+      content: trimmed
+    };
+    setChatMessages((prev) => [...prev, message]);
+    setChatInput('');
   };
 
   const statusInfo = intake?.status ? (statusMeta[intake.status] || statusMeta.pending) : statusMeta.pending;
@@ -185,6 +206,60 @@ export const PatientProfile = () => {
                     </Button>
                   </div>
                 )}
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-4">
+                  <div>
+                    <h2 className="text-xl font-bold text-[#0A2540]">Messagerie</h2>
+                    <p className="text-sm text-[#64748B]">Discutez avec un agent IA pour preparer le rendez-vous.</p>
+                  </div>
+                  <span className="text-xs text-[#64748B]">Bientot connecte a n8n</span>
+                </div>
+
+                <div className="bg-[#F8FAFC] rounded-2xl border border-slate-200 p-4 md:p-5">
+                  <div className="max-h-64 overflow-y-auto space-y-3">
+                    {chatMessages.map((message) => (
+                      <div
+                        key={message.id}
+                        className={`flex ${message.role === 'patient' ? 'justify-end' : 'justify-start'}`}
+                      >
+                        <div
+                          className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm ${
+                            message.role === 'patient'
+                              ? 'bg-[#0A2540] text-white'
+                              : 'bg-white text-[#0A2540] border border-slate-200'
+                          }`}
+                        >
+                          {message.content}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 flex flex-col gap-3">
+                    <Textarea
+                      value={chatInput}
+                      onChange={(event) => setChatInput(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' && !event.shiftKey) {
+                          event.preventDefault();
+                          handleSendMessage();
+                        }
+                      }}
+                      placeholder="Ecrivez votre message..."
+                      className="input-santia min-h-[96px]"
+                    />
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <Button className="btn-green px-6 py-3" onClick={handleSendMessage}>
+                        Envoyer
+                      </Button>
+                      <p className="text-xs text-[#64748B] self-center">
+                        Entree pour envoyer, Shift+Entree pour aller a la ligne.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
