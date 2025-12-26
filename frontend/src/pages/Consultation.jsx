@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from '../components/ui/select';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
+import { getToken, authHeaders } from '../lib/auth';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -81,6 +82,12 @@ export const Consultation = () => {
       setCurrentStep(2);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!getToken()) {
+      navigate('/login?next=/consultation');
+    }
+  }, [navigate]);
 
   const updateFormData = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -143,12 +150,10 @@ export const Consultation = () => {
         consent: formData.consent
       };
 
-      const response = await axios.post(`${API_URL}/api/intake`, payload);
-      const intakeId = response?.data?.id;
-      if (intakeId) {
-        localStorage.setItem('santia_intake_id', intakeId);
-      }
-      navigate('/confirmation', { state: { intakeId } });
+      await axios.post(`${API_URL}/api/intake`, payload, {
+        headers: authHeaders()
+      });
+      navigate('/confirmation');
     } catch (error) {
       console.error('Erreur lors de la soumission:', error);
       setErrors({ submit: 'Une erreur est survenue. Veuillez réessayer.' });

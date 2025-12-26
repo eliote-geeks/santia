@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Header
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -8,12 +8,14 @@ from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import asyncio
 import time
 import re
 import requests
 from urllib.parse import quote
+from jose import jwt, JWTError
+from passlib.context import CryptContext
 
 
 ROOT_DIR = Path(__file__).parent
@@ -32,6 +34,12 @@ app = FastAPI()
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
+
+AUTH_SECRET = os.environ.get("AUTH_SECRET", "change_me")
+AUTH_ALGORITHM = os.environ.get("AUTH_ALGORITHM", "HS256")
+AUTH_TOKEN_EXPIRE_MINUTES = int(os.environ.get("AUTH_TOKEN_EXPIRE_MINUTES", "10080"))
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class OpenEMRError(Exception):
     pass
@@ -110,6 +118,46 @@ def build_whatsapp_link(intake: dict, scheduled_at: datetime, meeting_url: str) 
         "Merci."
     )
     return f"https://wa.me/{phone}?text={quote(message)}"
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+def verify_password(password: str, password_hash: str) -> bool:
+    return pwd_context.verify(password, password_hash)
+
+def create_access_token(subject: str, email: str, role: str) -> str:
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=AUTH_TOKEN_EXPIRE_MINUTES)
+    payload = {
+        "sub": subject,
+        "email": email,
+        "role": role,
+        "exp": expires_at,
+    }
+    return jwt.encode(payload, AUTH_SECRET, algorithm=AUTH_ALGORITHM)
+
+def sanitize_user(user: dict) -> dict:
+    clean = dict(user)
+    clean.pop("password_hash", None)
+    clean.pop("password", None)
+    return clean
+
+async def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
+    if db is None:
+        raise HTTPException(status_code=503, detail="Base de donnees indisponible")
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Non authentifie")
+    token = authorization.split(" ", 1)[1]
+    try:
+        payload = jwt.decode(token, AUTH_SECRET, algorithms=[AUTH_ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token invalide")
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Token invalide")
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=401, detail="Utilisateur introuvable")
+    return user
 
 class OpenEMRClient:
     def __init__(self) -> None:
@@ -277,6 +325,31 @@ class StatusCheck(BaseModel):
 class StatusCheckCreate(BaseModel):
     client_name: str
 
+class UserCreate(BaseModel):
+    name: str
+    email: EmailStr
+    phone: str
+    password: str = Field(min_length=6)
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class UserResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str
+    name: str
+    email: EmailStr
+    phone: str
+    role: str
+    created_at: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
 # Intake Form Model
 class IntakeCreate(BaseModel):
     category: str
@@ -311,6 +384,7 @@ class IntakeResponse(BaseModel):
     scheduled_at: Optional[str] = None
     meeting_url: Optional[str] = None
     whatsapp_link: Optional[str] = None
+    user_id: Optional[str] = None
     openemr_patient_id: Optional[str] = None
     openemr_appointment_id: Optional[str] = None
 
@@ -348,9 +422,53 @@ async def get_status_checks():
     
     return status_checks
 
+@api_router.post("/auth/register", response_model=TokenResponse)
+async def register_user(input: UserCreate):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Base de donnees indisponible")
+    email = input.email.lower()
+    existing = await db.users.find_one({"email": email})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email deja utilise")
+    user_id = str(uuid.uuid4())
+    created_at = datetime.now(timezone.utc).isoformat()
+    user_doc = {
+        "id": user_id,
+        "name": input.name.strip(),
+        "email": email,
+        "phone": input.phone.strip(),
+        "password_hash": hash_password(input.password),
+        "role": "patient",
+        "created_at": created_at,
+    }
+    await db.users.insert_one(user_doc)
+    token = create_access_token(user_id, email, "patient")
+    return TokenResponse(
+        access_token=token,
+        user=UserResponse(**sanitize_user(user_doc)),
+    )
+
+@api_router.post("/auth/login", response_model=TokenResponse)
+async def login_user(input: UserLogin):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Base de donnees indisponible")
+    email = input.email.lower()
+    user = await db.users.find_one({"email": email}, {"_id": 0})
+    if not user or not verify_password(input.password, user.get("password_hash", "")):
+        raise HTTPException(status_code=401, detail="Identifiants invalides")
+    token = create_access_token(user["id"], user["email"], user.get("role", "patient"))
+    return TokenResponse(
+        access_token=token,
+        user=UserResponse(**sanitize_user(user)),
+    )
+
+@api_router.get("/auth/me", response_model=UserResponse)
+async def get_me(current_user: dict = Depends(get_current_user)):
+    return UserResponse(**sanitize_user(current_user))
+
 # Intake Form Endpoint
 @api_router.post("/intake", response_model=IntakeResponse)
-async def create_intake(input: IntakeCreate):
+async def create_intake(input: IntakeCreate, current_user: dict = Depends(get_current_user)):
     if not input.consent:
         raise HTTPException(status_code=400, detail="Le consentement est requis")
     
@@ -383,6 +501,7 @@ async def create_intake(input: IntakeCreate):
         "scheduled_at": None,
         "meeting_url": None,
         "whatsapp_link": None,
+        "user_id": current_user.get("id"),
         "openemr_patient_id": openemr_patient_id,
         "openemr_appointment_id": None,
     }
@@ -403,13 +522,26 @@ async def get_intakes():
     intakes = await db.intakes.find({}, {"_id": 0}).to_list(1000)
     return intakes
 
+@api_router.get("/intakes/me", response_model=List[IntakeResponse])
+async def get_my_intakes(current_user: dict = Depends(get_current_user)):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Base de donnees indisponible")
+    intakes = (
+        await db.intakes.find({"user_id": current_user.get("id")}, {"_id": 0})
+        .sort("created_at", -1)
+        .to_list(1000)
+    )
+    return intakes
+
 @api_router.get("/intakes/{intake_id}", response_model=IntakeResponse)
-async def get_intake(intake_id: str):
+async def get_intake(intake_id: str, current_user: dict = Depends(get_current_user)):
     if db is None:
         raise HTTPException(status_code=503, detail="Base de donnees indisponible")
     intake = await db.intakes.find_one({"id": intake_id}, {"_id": 0})
     if not intake:
         raise HTTPException(status_code=404, detail="Dossier introuvable")
+    if intake.get("user_id") and intake.get("user_id") != current_user.get("id"):
+        raise HTTPException(status_code=403, detail="Acces refuse")
     return intake
 
 @api_router.patch("/intakes/{intake_id}/schedule", response_model=IntakeResponse)

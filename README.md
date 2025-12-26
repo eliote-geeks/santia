@@ -47,7 +47,8 @@ REACT_APP_BACKEND_URL=http://localhost:8001 npm start
 - Manual scheduling: `PATCH /api/intakes/{id}/schedule` sets `scheduled_at`, creates a Jitsi link, and (if OpenEMR is configured) creates the OpenEMR appointment.
 - Jitsi base URL can be set with `JITSI_BASE_URL` (default `http://localhost:8000`).
 - Admin UI: open `http://localhost:3000/admin` to schedule and get WhatsApp links.
-- Patient profile: `http://localhost:3000/dossier/{id}` shows status and meeting link.
+- Patient profile: `http://localhost:3000/dossier` shows status and meeting link.
+- Patient auth (no OTP for now): `/login` and `/register`, token stored in localStorage.
 - For production, use OAuth Authorization Code Grant instead of password grant.
 
 ## Deployment

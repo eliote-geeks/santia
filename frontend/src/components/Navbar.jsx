@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, Phone } from 'lucide-react';
+import { getToken } from '../lib/auth';
 
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
+  const isAuthed = !!getToken();
 
   const isActive = (path) => location.pathname === path;
 
@@ -55,6 +57,14 @@ export const Navbar = () => {
             >
               FAQ
             </a>
+            <Link
+              to={isAuthed ? "/dossier" : "/login"}
+              className={`text-sm font-medium transition-colors duration-200 ${
+                isActive('/login') || isActive('/dossier') ? 'text-[#2ECC71]' : 'text-[#0A2540] hover:text-[#2ECC71]'
+              }`}
+            >
+              Espace patient
+            </Link>
           </div>
 
           {/* CTA Button */}
@@ -116,6 +126,13 @@ export const Navbar = () => {
             >
               FAQ
             </a>
+            <Link
+              to={isAuthed ? "/dossier" : "/login"}
+              className="block py-3 text-lg font-medium text-[#0A2540]"
+              onClick={() => setIsOpen(false)}
+            >
+              Espace patient
+            </Link>
             <div className="pt-4 border-t border-slate-100">
               <Link 
                 to="/consultation" 

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { Button } from '../components/ui/button';
 import { Textarea } from '../components/ui/textarea';
+import { authHeaders, getToken } from '../lib/auth';
 import {
   Calendar,
   Clock,
@@ -49,6 +50,8 @@ const formatDateTime = (value) => {
 
 export const PatientProfile = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [intake, setIntake] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -64,18 +67,32 @@ export const PatientProfile = () => {
 
   useEffect(() => {
     const fetchIntake = async () => {
+      if (!getToken()) {
+        navigate(`/login?next=${encodeURIComponent(location.pathname)}`);
+        return;
+      }
       try {
-        const response = await axios.get(`${API_URL}/api/intakes/${id}`);
-        setIntake(response.data);
+        if (id) {
+          const response = await axios.get(`${API_URL}/api/intakes/${id}`, { headers: authHeaders() });
+          setIntake(response.data);
+        } else {
+          const response = await axios.get(`${API_URL}/api/intakes/me`, { headers: authHeaders() });
+          const items = response.data || [];
+          setIntake(items[0] || null);
+        }
       } catch (err) {
-        setError('Impossible de charger votre dossier.');
+        if (err.response?.status === 401) {
+          setError('Veuillez vous connecter pour acceder a votre dossier.');
+        } else {
+          setError('Impossible de charger votre dossier.');
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchIntake();
-  }, [id]);
+  }, [id, navigate, location.pathname]);
 
   const handleCopy = async () => {
     if (!intake?.meeting_url) return;
@@ -114,7 +131,7 @@ export const PatientProfile = () => {
             <div>
               <p className="text-sm text-[#64748B]">Dossier patient</p>
               <h1 className="text-3xl md:text-4xl font-bold text-[#0A2540]">Suivi de votre consultation</h1>
-              <p className="text-sm text-[#64748B] mt-2">Reference: {id}</p>
+              {id && <p className="text-sm text-[#64748B] mt-2">Reference: {id}</p>}
             </div>
             <Link to="/" className="text-sm text-[#0A2540] hover:text-[#2ECC71] transition-colors">
               Retour a l'accueil
@@ -140,6 +157,16 @@ export const PatientProfile = () => {
             <div className="bg-white rounded-2xl shadow-lg p-8 text-center" data-testid="profile-error">
               <p className="text-[#0A2540] font-semibold mb-2">Oups</p>
               <p className="text-sm text-[#64748B]">{error}</p>
+            </div>
+          )}
+
+          {!loading && !intake && !error && (
+            <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
+              <p className="text-[#0A2540] font-semibold mb-2">Aucune demande trouvee</p>
+              <p className="text-sm text-[#64748B] mb-6">Soumettez une demande pour acceder a votre dossier.</p>
+              <Link to="/consultation">
+                <Button className="btn-green px-6 py-3">Commencer une consultation</Button>
+              </Link>
             </div>
           )}
 

@@ -18,6 +18,7 @@ Build a modern, trust-focused teleconsultation website for brand "Santia".
 - `/api/intakes` - GET endpoint to list all intake records
 - `/api/intakes/{id}` - GET endpoint for patient profile view
 - `/api/intakes/{id}/schedule` - PATCH endpoint for manual scheduling
+- `/api/auth/register` and `/api/auth/login` for patient authentication (no OTP yet)
 - MongoDB integration for data persistence
 - Input validation with Pydantic models
 - OpenEMR integration for patient creation (intake) and appointment creation (schedule)
