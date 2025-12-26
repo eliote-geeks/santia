@@ -20,6 +20,15 @@ const statusLabel = {
   done: 'Terminee'
 };
 
+const categoryLabels = {
+  'sante-sexuelle': 'Sante sexuelle',
+  addictions: 'Addictions',
+  'perte-de-poids': 'Perte de poids',
+  sommeil: 'Sommeil',
+  cheveux: 'Cheveux',
+  fertilite: 'Fertilite'
+};
+
 const formatDateTime = (value) => {
   if (!value) return 'A planifier';
   const date = new Date(value);
@@ -134,7 +143,7 @@ export const Admin = () => {
                           {statusLabel[intake.status] || statusLabel.pending}
                         </span>
                       </div>
-                      <p className="text-sm text-[#64748B]">{intake.category} • {intake.city}</p>
+                      <p className="text-sm text-[#64748B]">{categoryLabels[intake.category] || intake.category} • {intake.city}</p>
                       <p className="text-xs text-[#94A3B8] mt-1">ID: {intake.id}</p>
                     </div>
                     <Link to={`/dossier/${intake.id}`} className="text-sm text-[#0A2540] hover:text-[#2ECC71] transition-colors">

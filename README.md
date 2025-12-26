@@ -49,3 +49,6 @@ REACT_APP_BACKEND_URL=http://localhost:8001 npm start
 - Admin UI: open `http://localhost:3000/admin` to schedule and get WhatsApp links.
 - Patient profile: `http://localhost:3000/dossier/{id}` shows status and meeting link.
 - For production, use OAuth Authorization Code Grant instead of password grant.
+
+## Deployment
+See `deploy/README.md` for Docker Compose deployment (app + OpenEMR + Jitsi).

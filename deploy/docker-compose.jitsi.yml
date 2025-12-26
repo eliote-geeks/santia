@@ -1,0 +1,86 @@
+version: "3.9"
+
+services:
+  jitsi-prosody:
+    image: jitsi/prosody:stable
+    container_name: santia-jitsi-prosody
+    restart: unless-stopped
+    environment:
+      XMPP_DOMAIN: ${JITSI_XMPP_DOMAIN}
+      XMPP_AUTH_DOMAIN: auth.${JITSI_XMPP_DOMAIN}
+      XMPP_MUC_DOMAIN: muc.${JITSI_XMPP_DOMAIN}
+      XMPP_INTERNAL_MUC_DOMAIN: internal-muc.${JITSI_XMPP_DOMAIN}
+      JICOFO_COMPONENT_SECRET: ${JITSI_JICOFO_COMPONENT_SECRET}
+      JICOFO_AUTH_USER: focus
+      JICOFO_AUTH_PASSWORD: ${JITSI_JICOFO_AUTH_PASSWORD}
+      JVB_AUTH_USER: jvb
+      JVB_AUTH_PASSWORD: ${JITSI_JVB_AUTH_PASSWORD}
+      TZ: ${TZ}
+    volumes:
+      - jitsi_prosody_data:/config
+    networks:
+      - santia
+
+  jitsi-web:
+    image: jitsi/web:stable
+    container_name: santia-jitsi-web
+    restart: unless-stopped
+    depends_on:
+      - jitsi-prosody
+    environment:
+      PUBLIC_URL: ${JITSI_PUBLIC_URL}
+      ENABLE_AUTH: 0
+      ENABLE_GUESTS: 1
+      XMPP_DOMAIN: ${JITSI_XMPP_DOMAIN}
+      XMPP_AUTH_DOMAIN: auth.${JITSI_XMPP_DOMAIN}
+      XMPP_BOSH_URL_BASE: http://jitsi-prosody:5280
+      XMPP_SERVER: jitsi-prosody
+      TZ: ${TZ}
+    ports:
+      - "${JITSI_HTTP_PORT}:80"
+    networks:
+      - santia
+
+  jitsi-jicofo:
+    image: jitsi/jicofo:stable
+    container_name: santia-jitsi-jicofo
+    restart: unless-stopped
+    depends_on:
+      - jitsi-prosody
+    environment:
+      XMPP_DOMAIN: ${JITSI_XMPP_DOMAIN}
+      XMPP_AUTH_DOMAIN: auth.${JITSI_XMPP_DOMAIN}
+      XMPP_INTERNAL_MUC_DOMAIN: internal-muc.${JITSI_XMPP_DOMAIN}
+      XMPP_SERVER: jitsi-prosody
+      JICOFO_AUTH_USER: focus
+      JICOFO_AUTH_PASSWORD: ${JITSI_JICOFO_AUTH_PASSWORD}
+      JICOFO_COMPONENT_SECRET: ${JITSI_JICOFO_COMPONENT_SECRET}
+      TZ: ${TZ}
+    networks:
+      - santia
+
+  jitsi-jvb:
+    image: jitsi/jvb:stable
+    container_name: santia-jitsi-jvb
+    restart: unless-stopped
+    depends_on:
+      - jitsi-prosody
+    environment:
+      XMPP_AUTH_DOMAIN: auth.${JITSI_XMPP_DOMAIN}
+      XMPP_INTERNAL_MUC_DOMAIN: internal-muc.${JITSI_XMPP_DOMAIN}
+      XMPP_SERVER: jitsi-prosody
+      JVB_AUTH_USER: jvb
+      JVB_AUTH_PASSWORD: ${JITSI_JVB_AUTH_PASSWORD}
+      JVB_BREWERY_MUC: jvbbrewery
+      JVB_ADVERTISE_IP: ${JITSI_ADVERTISE_IP}
+      TZ: ${TZ}
+    ports:
+      - "${JITSI_JVB_PORT}:10000/udp"
+    networks:
+      - santia
+
+networks:
+  santia:
+
+volumes:
+  jitsi_prosody_data:

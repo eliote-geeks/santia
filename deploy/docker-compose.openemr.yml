@@ -1,0 +1,42 @@
+version: "3.9"
+
+services:
+  openemr-mysql:
+    image: mariadb:10.6
+    container_name: santia-openemr-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${OPENEMR_MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: openemr
+      MYSQL_USER: openemr
+      MYSQL_PASSWORD: ${OPENEMR_MYSQL_PASSWORD}
+    volumes:
+      - openemr_mysql_data:/var/lib/mysql
+    networks:
+      - santia
+
+  openemr:
+    image: openemr/openemr:7.0.2
+    container_name: santia-openemr
+    restart: unless-stopped
+    depends_on:
+      - openemr-mysql
+    environment:
+      MYSQL_HOST: openemr-mysql
+      MYSQL_ROOT_PASS: ${OPENEMR_MYSQL_ROOT_PASSWORD}
+      MYSQL_USER: openemr
+      MYSQL_PASS: ${OPENEMR_MYSQL_PASSWORD}
+      OE_USER: admin
+      OE_PASS: ${OPENEMR_ADMIN_PASSWORD}
+      OE_SITE_ID: ${OPENEMR_SITE}
+      TZ: ${TZ}
+    ports:
+      - "${OPENEMR_PORT}:80"
+    networks:
+      - santia
+
+networks:
+  santia:
+
+volumes:
+  openemr_mysql_data:

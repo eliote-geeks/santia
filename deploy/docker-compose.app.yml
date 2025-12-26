@@ -1,0 +1,50 @@
+version: "3.9"
+
+services:
+  mongo:
+    image: mongo:7.0
+    container_name: santia-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - santia
+
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    container_name: santia-backend
+    restart: unless-stopped
+    env_file:
+      - ./env
+    environment:
+      MONGO_URL: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongo:27017/?authSource=admin
+    depends_on:
+      - mongo
+    ports:
+      - "8001:8001"
+    networks:
+      - santia
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+      args:
+        REACT_APP_BACKEND_URL: ${PUBLIC_BACKEND_URL}
+    container_name: santia-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    networks:
+      - santia
+
+networks:
+  santia:
+
+volumes:
+  mongo_data:

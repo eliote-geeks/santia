@@ -71,6 +71,9 @@ Build a modern, trust-focused teleconsultation website for brand "Santia".
 ### Backend Environment
 See `backend/.env.example` for the OpenEMR and MongoDB variables.
 
+## Deployment
+Docker Compose files are available in `deploy/` for app, OpenEMR, and Jitsi.
+
 ## Next Tasks / Enhancements
 1. **Payment Integration:** Add Stripe/Mobile Money for consultation fees (5000 FCFA+)
 2. **Email Notifications:** Send confirmation email to patient after submission
