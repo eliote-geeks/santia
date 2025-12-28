@@ -64,7 +64,7 @@ export const Register = () => {
                   value={formData.name}
                   onChange={(event) => handleChange('name', event.target.value)}
                   className="input-santia"
-                  placeholder="Jean Dupont"
+                  placeholder="Brice Ngassa"
                   required
                 />
               </div>

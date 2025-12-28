@@ -327,7 +327,7 @@ export const Consultation = () => {
                     <Label htmlFor="name" className="text-[#0A2540] font-medium mb-2 block">Nom complet *</Label>
                     <Input
                       id="name"
-                      placeholder="Jean Dupont"
+                      placeholder="Brice Ngassa"
                       value={formData.name}
                       onChange={(e) => updateFormData('name', e.target.value)}
                       className="input-santia"
