@@ -6,7 +6,7 @@ import { Footer } from '../components/Footer';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { setAuth } from '../lib/auth';
+import { setAuth, setOpenIM } from '../lib/auth';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -31,6 +31,7 @@ export const Login = () => {
     try {
       const response = await axios.post(`${API_URL}/api/auth/login`, formData);
       setAuth(response.data.access_token, response.data.user);
+      setOpenIM(response.data.openim);
       navigate(nextPath);
     } catch (err) {
       setError('Identifiants invalides.');

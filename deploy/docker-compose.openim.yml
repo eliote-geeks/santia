@@ -1,0 +1,239 @@
+version: "3.9"
+
+services:
+  openim-mongo:
+    image: ${OPENIM_MONGO_IMAGE}
+    container_name: santia-openim-mongo
+    command: >
+      bash -c '
+      docker-entrypoint.sh mongod --wiredTigerCacheSizeGB $$wiredTigerCacheSizeGB --auth &
+      until mongosh -u $$OPENIM_MONGO_ROOT_USER -p $$OPENIM_MONGO_ROOT_PASSWORD --authenticationDatabase admin --eval "db.runCommand({ ping: 1 })" &>/dev/null; do
+        echo "Waiting for MongoDB to start..."
+        sleep 1
+      done &&
+      mongosh -u $$OPENIM_MONGO_ROOT_USER -p $$OPENIM_MONGO_ROOT_PASSWORD --authenticationDatabase admin --eval "
+      db = db.getSiblingDB(\"$$OPENIM_MONGO_DATABASE\");
+      if (!db.getUser(\"$$OPENIM_MONGO_USERNAME\")) {
+        db.createUser({
+          user: \"$$OPENIM_MONGO_USERNAME\",
+          pwd: \"$$OPENIM_MONGO_PASSWORD\",
+          roles: [{role: \"readWrite\", db: \"$$OPENIM_MONGO_DATABASE\"}]
+        });
+        print(\"User created successfully: \");
+        print(\"Username: $$OPENIM_MONGO_USERNAME\");
+        print(\"Password: $$OPENIM_MONGO_PASSWORD\");
+        print(\"Database: $$OPENIM_MONGO_DATABASE\");
+      } else {
+        print(\"User already exists in database: $$OPENIM_MONGO_DATABASE, Username: $$OPENIM_MONGO_USERNAME\");
+      }
+      " &&
+      tail -f /dev/null
+      '
+    volumes:
+      - "${OPENIM_DATA_DIR}/mongo/db:/data/db"
+      - "${OPENIM_DATA_DIR}/mongo/logs:/data/logs"
+      - "${OPENIM_DATA_DIR}/mongo/conf:/etc/mongo"
+    environment:
+      - TZ=${TZ}
+      - wiredTigerCacheSizeGB=1
+      - MONGO_INITDB_ROOT_USERNAME=${OPENIM_MONGO_ROOT_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${OPENIM_MONGO_ROOT_PASSWORD}
+      - MONGO_INITDB_DATABASE=${OPENIM_MONGO_DATABASE}
+      - OPENIM_MONGO_ROOT_USER=${OPENIM_MONGO_ROOT_USER}
+      - OPENIM_MONGO_ROOT_PASSWORD=${OPENIM_MONGO_ROOT_PASSWORD}
+      - OPENIM_MONGO_DATABASE=${OPENIM_MONGO_DATABASE}
+      - OPENIM_MONGO_USERNAME=${OPENIM_MONGO_USERNAME}
+      - OPENIM_MONGO_PASSWORD=${OPENIM_MONGO_PASSWORD}
+    restart: unless-stopped
+    networks:
+      - santia
+
+  openim-redis:
+    image: ${OPENIM_REDIS_IMAGE}
+    container_name: santia-openim-redis
+    volumes:
+      - "${OPENIM_DATA_DIR}/redis/data:/data"
+    environment:
+      TZ: ${TZ}
+    restart: unless-stopped
+    sysctls:
+      net.core.somaxconn: 1024
+    command:
+      [
+        "redis-server",
+        "--requirepass",
+        "${OPENIM_REDIS_PASSWORD}",
+        "--appendonly",
+        "yes",
+      ]
+    networks:
+      - santia
+
+  openim-etcd:
+    image: ${OPENIM_ETCD_IMAGE}
+    container_name: santia-openim-etcd
+    environment:
+      - ETCD_NAME=s1
+      - ETCD_DATA_DIR=/etcd-data
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_ADVERTISE_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380
+      - ETCD_INITIAL_ADVERTISE_PEER_URLS=http://0.0.0.0:2380
+      - ETCD_INITIAL_CLUSTER=s1=http://0.0.0.0:2380
+      - ETCD_INITIAL_CLUSTER_TOKEN=tkn
+      - ETCD_INITIAL_CLUSTER_STATE=new
+      - ALLOW_NONE_AUTHENTICATION=yes
+    volumes:
+      - "${OPENIM_DATA_DIR}/etcd:/etcd-data"
+    restart: unless-stopped
+    networks:
+      - santia
+
+  openim-kafka:
+    image: ${OPENIM_KAFKA_IMAGE}
+    container_name: santia-openim-kafka
+    user: root
+    restart: unless-stopped
+    volumes:
+      - "${OPENIM_DATA_DIR}/kafka:/bitnami/kafka"
+    environment:
+      TZ: ${TZ}
+      KAFKA_CFG_NODE_ID: 0
+      KAFKA_CFG_PROCESS_ROLES: controller,broker
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 0@openim-kafka:9093
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_NUM_PARTITIONS: 8
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_CFG_LISTENERS: "INTERNAL://:9092,CONTROLLER://:9093,EXTERNAL://:9094"
+      KAFKA_CFG_ADVERTISED_LISTENERS: "INTERNAL://openim-kafka:9092,EXTERNAL://openim-kafka:9094"
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT,INTERNAL:PLAINTEXT"
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: "INTERNAL"
+      KAFKA_USERNAME: ${OPENIM_KAFKA_USERNAME}
+      KAFKA_PASSWORD: ${OPENIM_KAFKA_PASSWORD}
+    command: >
+      /bin/sh -c '
+        if [ -n "$${KAFKA_USERNAME}" ] && [ -n "$${KAFKA_PASSWORD}" ]; then
+          echo "=== Kafka SASL Authentication ENABLED ==="
+          export KAFKA_CFG_LISTENERS="SASL_PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094"
+          export KAFKA_CFG_ADVERTISED_LISTENERS="SASL_PLAINTEXT://openim-kafka:9092,EXTERNAL://openim-kafka:9094"
+          export KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP="CONTROLLER:PLAINTEXT,EXTERNAL:SASL_PLAINTEXT,SASL_PLAINTEXT:SASL_PLAINTEXT"
+          export KAFKA_CFG_SASL_ENABLED_MECHANISMS="PLAIN"
+          export KAFKA_CFG_SASL_MECHANISM_INTER_BROKER_PROTOCOL="PLAIN"
+          export KAFKA_CFG_INTER_BROKER_LISTENER_NAME="SASL_PLAINTEXT"
+          export KAFKA_CLIENT_USERS="$${KAFKA_USERNAME}"
+          export KAFKA_CLIENT_PASSWORDS="$${KAFKA_PASSWORD}"
+        fi
+        exec /opt/bitnami/scripts/kafka/entrypoint.sh /opt/bitnami/scripts/kafka/run.sh
+      '
+    networks:
+      - santia
+
+  openim-minio:
+    image: ${OPENIM_MINIO_IMAGE}
+    container_name: santia-openim-minio
+    ports:
+      - "${OPENIM_MINIO_PORT}:9000"
+      - "${OPENIM_MINIO_CONSOLE_PORT}:9090"
+    volumes:
+      - "${OPENIM_DATA_DIR}/minio/data:/data"
+      - "${OPENIM_DATA_DIR}/minio/config:/root/.minio"
+    environment:
+      TZ: ${TZ}
+      MINIO_ROOT_USER: "${OPENIM_MINIO_ACCESS_KEY_ID}"
+      MINIO_ROOT_PASSWORD: "${OPENIM_MINIO_SECRET_ACCESS_KEY}"
+    restart: unless-stopped
+    command: minio server /data --console-address ':9090'
+    networks:
+      - santia
+
+  openim-server:
+    image: ${OPENIM_SERVER_IMAGE}
+    container_name: santia-openim-server
+    init: true
+    ports:
+      - "${OPENIM_MSG_GATEWAY_PORT}:10001"
+      - "${OPENIM_API_PORT}:10002"
+    healthcheck:
+      test: ["CMD", "sh", "-c", "mage check"]
+      interval: 5s
+      timeout: 60s
+      retries: 10
+    environment:
+      - IMENV_MONGODB_ADDRESS=${OPENIM_MONGO_ADDRESS}
+      - IMENV_MONGODB_USERNAME=${OPENIM_MONGO_USERNAME}
+      - IMENV_MONGODB_PASSWORD=${OPENIM_MONGO_PASSWORD}
+      - IMENV_KAFKA_ADDRESS=${OPENIM_KAFKA_ADDRESS}
+      - IMENV_KAFKA_USERNAME=${OPENIM_KAFKA_USERNAME}
+      - IMENV_KAFKA_PASSWORD=${OPENIM_KAFKA_PASSWORD}
+      - IMENV_DISCOVERY_ETCD_ADDRESS=${OPENIM_ETCD_ADDRESS}
+      - IMENV_DISCOVERY_ETCD_USERNAME=${OPENIM_ETCD_USERNAME}
+      - IMENV_DISCOVERY_ETCD_PASSWORD=${OPENIM_ETCD_PASSWORD}
+      - IMENV_REDIS_ADDRESS=${OPENIM_REDIS_ADDRESS}
+      - IMENV_REDIS_PASSWORD=${OPENIM_REDIS_PASSWORD}
+      - IMENV_MINIO_INTERNALADDRESS=${OPENIM_MINIO_INTERNAL_ADDRESS}
+      - IMENV_MINIO_EXTERNALADDRESS=${OPENIM_MINIO_EXTERNAL_ADDRESS}
+      - IMENV_MINIO_ACCESSKEYID=${OPENIM_MINIO_ACCESS_KEY_ID}
+      - IMENV_MINIO_SECRETACCESSKEY=${OPENIM_MINIO_SECRET_ACCESS_KEY}
+      - IMENV_SHARE_SECRET=${OPENIM_SECRET}
+      - IMENV_LOG_ISSTDOUT=${OPENIM_LOG_IS_STDOUT}
+      - IMENV_LOG_REMAINLOGLEVEL=${OPENIM_LOG_LEVEL}
+    restart: unless-stopped
+    depends_on:
+      - openim-mongo
+      - openim-redis
+      - openim-etcd
+      - openim-kafka
+      - openim-minio
+    networks:
+      - santia
+
+  openim-chat:
+    image: ${OPENIM_CHAT_IMAGE}
+    container_name: santia-openim-chat
+    init: true
+    healthcheck:
+      test: ["CMD", "sh", "-c", "mage check"]
+      interval: 5s
+      timeout: 60s
+      retries: 10
+    environment:
+      - CHATENV_MONGODB_ADDRESS=${OPENIM_MONGO_ADDRESS}
+      - CHATENV_MONGODB_USERNAME=${OPENIM_MONGO_USERNAME}
+      - CHATENV_MONGODB_PASSWORD=${OPENIM_MONGO_PASSWORD}
+      - CHATENV_DISCOVERY_ETCD_ADDRESS=${OPENIM_ETCD_ADDRESS}
+      - CHATENV_DISCOVERY_ETCD_USERNAME=${OPENIM_ETCD_USERNAME}
+      - CHATENV_DISCOVERY_ETCD_PASSWORD=${OPENIM_ETCD_PASSWORD}
+      - CHATENV_REDIS_ADDRESS=${OPENIM_REDIS_ADDRESS}
+      - CHATENV_REDIS_PASSWORD=${OPENIM_REDIS_PASSWORD}
+      - CHATENV_SHARE_OPENIM_SECRET=${OPENIM_SECRET}
+      - CHATENV_SHARE_OPENIM_APIURL=${OPENIM_API_URL}
+      - CHATENV_LOG_ISSTDOUT=${OPENIM_LOG_IS_STDOUT}
+      - CHATENV_LOG_REMAINLOGLEVEL=${OPENIM_LOG_LEVEL}
+    ports:
+      - "${OPENIM_CHAT_API_PORT}:10008"
+      - "${OPENIM_ADMIN_API_PORT}:10009"
+    restart: unless-stopped
+    depends_on:
+      - openim-mongo
+      - openim-redis
+      - openim-etcd
+      - openim-kafka
+      - openim-minio
+      - openim-server
+    networks:
+      - santia
+
+  openim-web-front:
+    image: ${OPENIM_WEB_IMAGE}
+    container_name: santia-openim-web
+    restart: unless-stopped
+    ports:
+      - "${OPENIM_WEB_PORT}:80"
+    volumes:
+      - "./openim/web/sso.html:/usr/share/nginx/html/sso.html:ro"
+    networks:
+      - santia
+
+networks:
+  santia:
+    name: santia

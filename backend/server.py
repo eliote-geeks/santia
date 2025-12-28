@@ -8,6 +8,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional
 import uuid
+import hashlib
 from datetime import datetime, timezone, timedelta
 import asyncio
 import time
@@ -42,6 +43,9 @@ AUTH_TOKEN_EXPIRE_MINUTES = int(os.environ.get("AUTH_TOKEN_EXPIRE_MINUTES", "100
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class OpenEMRError(Exception):
+    pass
+
+class OpenIMError(Exception):
     pass
 
 def split_name(full_name: str) -> dict:
@@ -314,6 +318,101 @@ class OpenEMRClient:
 
 openemr_client = OpenEMRClient()
 
+class OpenIMClient:
+    def __init__(self) -> None:
+        self.chat_base_url = os.environ.get("OPENIM_CHAT_BASE_URL", "").rstrip("/")
+        self.admin_base_url = os.environ.get("OPENIM_ADMIN_BASE_URL", "").rstrip("/")
+        self.admin_account = os.environ.get("OPENIM_ADMIN_ACCOUNT", "chatAdmin")
+        self.admin_password = os.environ.get("OPENIM_ADMIN_PASSWORD", "")
+        self.admin_version = os.environ.get("OPENIM_ADMIN_VERSION", "1.0")
+        self.platform_id = int(os.environ.get("OPENIM_PLATFORM_ID", "5"))
+        self._admin_token = None
+        self._admin_token_expires_at = 0.0
+
+    def can_login(self) -> bool:
+        return bool(self.chat_base_url)
+
+    def can_register(self) -> bool:
+        return bool(self.chat_base_url and self.admin_base_url)
+
+    def _admin_password(self) -> str:
+        if self.admin_password:
+            return self.admin_password
+        digest = hashlib.md5(self.admin_account.encode("utf-8")).hexdigest()
+        return digest
+
+    def _headers(self, token: Optional[str] = None) -> dict:
+        headers = {
+            "Content-Type": "application/json",
+            "operationID": str(uuid.uuid4()),
+        }
+        if token:
+            headers["token"] = token
+        return headers
+
+    def _post(self, url: str, payload: dict, token: Optional[str] = None) -> dict:
+        response = requests.post(
+            url,
+            json=payload,
+            headers=self._headers(token),
+            timeout=15,
+        )
+        if response.status_code != 200:
+            raise OpenIMError(f"HTTP {response.status_code}: {response.text}")
+        data = response.json()
+        err_code = data.get("errCode", 0)
+        if err_code:
+            raise OpenIMError(f"OpenIM error {err_code}: {data.get('errMsg')}")
+        return data.get("data") or {}
+
+    def _ensure_admin_token(self) -> str:
+        now = time.time()
+        if self._admin_token and now < self._admin_token_expires_at - 60:
+            return self._admin_token
+        if not self.admin_base_url:
+            raise OpenIMError("OpenIM admin base URL is not configured")
+        payload = {
+            "account": self.admin_account,
+            "password": self._admin_password(),
+            "version": self.admin_version,
+        }
+        data = self._post(f"{self.admin_base_url}/account/login", payload)
+        token = data.get("adminToken")
+        if not token:
+            raise OpenIMError("Admin token missing from response")
+        self._admin_token = token
+        self._admin_token_expires_at = now + 3600
+        return token
+
+    def register_user(self, name: str, email: str, password: str) -> dict:
+        if not self.can_register():
+            raise OpenIMError("OpenIM register is not configured")
+        token = self._ensure_admin_token()
+        payload = {
+            "deviceID": "santia-web",
+            "platform": self.platform_id,
+            "autoLogin": True,
+            "user": {
+                "nickname": name,
+                "email": email,
+                "password": password,
+            },
+        }
+        return self._post(f"{self.chat_base_url}/account/register", payload, token=token)
+
+    def login_user(self, email: str, password: str) -> dict:
+        if not self.can_login():
+            raise OpenIMError("OpenIM login is not configured")
+        payload = {
+            "deviceID": "santia-web",
+            "platform": self.platform_id,
+            "email": email,
+            "password": password,
+        }
+        return self._post(f"{self.chat_base_url}/account/login", payload)
+
+openim_client = OpenIMClient()
+
 # Define Models
 class StatusCheck(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -342,13 +441,30 @@ class UserResponse(BaseModel):
     name: str
     email: EmailStr
     phone: str
+    openim_user_id: Optional[str] = None
     role: str
     created_at: str
+
+class OpenIMTokens(BaseModel):
+    im_token: str
+    chat_token: str
+    user_id: str
 
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
+    openim: Optional[OpenIMTokens] = None
+
+def build_openim_tokens(payload: Optional[dict]) -> Optional[OpenIMTokens]:
+    if not payload:
+        return None
+    im_token = payload.get("imToken") or payload.get("im_token")
+    chat_token = payload.get("chatToken") or payload.get("chat_token")
+    user_id = payload.get("userID") or payload.get("user_id")
+    if not (im_token and chat_token and user_id):
+        return None
+    return OpenIMTokens(im_token=im_token, chat_token=chat_token, user_id=user_id)
 
 # Intake Form Model
 class IntakeCreate(BaseModel):
@@ -432,6 +548,21 @@ async def register_user(input: UserCreate):
         raise HTTPException(status_code=400, detail="Email deja utilise")
     user_id = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
+    openim_tokens = None
+    openim_user_id = None
+    if openim_client.can_register():
+        try:
+            openim_payload = await asyncio.to_thread(
+                openim_client.register_user,
+                input.name.strip(),
+                email,
+                input.password,
+            )
+            openim_tokens = build_openim_tokens(openim_payload)
+            if openim_tokens:
+                openim_user_id = openim_tokens.user_id
+        except OpenIMError as exc:
+            logger.warning("OpenIM register failed: %s", exc)
     user_doc = {
         "id": user_id,
         "name": input.name.strip(),
@@ -440,12 +571,14 @@ async def register_user(input: UserCreate):
         "password_hash": hash_password(input.password),
         "role": "patient",
         "created_at": created_at,
+        "openim_user_id": openim_user_id,
     }
     await db.users.insert_one(user_doc)
     token = create_access_token(user_id, email, "patient")
     return TokenResponse(
         access_token=token,
         user=UserResponse(**sanitize_user(user_doc)),
+        openim=openim_tokens,
     )
 
 @api_router.post("/auth/login", response_model=TokenResponse)
@@ -456,10 +589,28 @@ async def login_user(input: UserLogin):
     user = await db.users.find_one({"email": email}, {"_id": 0})
     if not user or not verify_password(input.password, user.get("password_hash", "")):
         raise HTTPException(status_code=401, detail="Identifiants invalides")
+    openim_tokens = None
+    if openim_client.can_login():
+        try:
+            openim_payload = await asyncio.to_thread(
+                openim_client.login_user,
+                email,
+                input.password,
+            )
+            openim_tokens = build_openim_tokens(openim_payload)
+            if openim_tokens and user.get("openim_user_id") != openim_tokens.user_id:
+                await db.users.update_one(
+                    {"id": user["id"]},
+                    {"$set": {"openim_user_id": openim_tokens.user_id}},
+                )
+                user["openim_user_id"] = openim_tokens.user_id
+        except OpenIMError as exc:
+            logger.warning("OpenIM login failed: %s", exc)
     token = create_access_token(user["id"], user["email"], user.get("role", "patient"))
     return TokenResponse(
         access_token=token,
         user=UserResponse(**sanitize_user(user)),
+        openim=openim_tokens,
     )
 
 @api_router.get("/auth/me", response_model=UserResponse)

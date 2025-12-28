@@ -65,6 +65,16 @@ export const Navbar = () => {
             >
               Espace patient
             </Link>
+            {isAuthed && (
+              <Link
+                to="/messagerie"
+                className={`text-sm font-medium transition-colors duration-200 ${
+                  isActive('/messagerie') ? 'text-[#2ECC71]' : 'text-[#0A2540] hover:text-[#2ECC71]'
+                }`}
+              >
+                Messagerie
+              </Link>
+            )}
           </div>
 
           {/* CTA Button */}
@@ -133,6 +143,15 @@ export const Navbar = () => {
             >
               Espace patient
             </Link>
+            {isAuthed && (
+              <Link
+                to="/messagerie"
+                className="block py-3 text-lg font-medium text-[#0A2540]"
+                onClick={() => setIsOpen(false)}
+              >
+                Messagerie
+              </Link>
+            )}
             <div className="pt-4 border-t border-slate-100">
               <Link 
                 to="/consultation" 

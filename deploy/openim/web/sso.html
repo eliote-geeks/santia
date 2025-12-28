@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Santia — Messagerie</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f8fafc;
+        color: #0a2540;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+      }
+      .card {
+        background: #ffffff;
+        border-radius: 16px;
+        box-shadow: 0 18px 60px rgba(15, 23, 42, 0.12);
+        padding: 32px;
+        max-width: 420px;
+        text-align: center;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 12px;
+      }
+      p {
+        margin: 0;
+        font-size: 14px;
+        color: #64748b;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Connexion a la messagerie...</h1>
+      <p>Merci de patienter, nous ouvrons votre espace de discussion.</p>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
+    <script>
+      function base64UrlDecode(value) {
+        if (!value) return null;
+        let base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+        while (base64.length % 4) {
+          base64 += "=";
+        }
+        try {
+          return decodeURIComponent(escape(atob(base64)));
+        } catch (error) {
+          return null;
+        }
+      }
+
+      function getPayload() {
+        const params = new URLSearchParams(window.location.search);
+        const raw = params.get("payload");
+        if (!raw) return null;
+        const json = base64UrlDecode(raw);
+        if (!json) return null;
+        try {
+          return JSON.parse(json);
+        } catch (error) {
+          return null;
+        }
+      }
+
+      async function bootstrap() {
+        const payload = getPayload();
+        if (!payload) {
+          document.querySelector("h1").textContent = "Impossible de connecter la messagerie.";
+          document.querySelector("p").textContent = "Session invalide. Merci de retourner sur Santia.";
+          return;
+        }
+        if (payload.apiUrl) {
+          localStorage.setItem("apiUrl", payload.apiUrl);
+        }
+        if (payload.chatUrl) {
+          localStorage.setItem("chatUrl", payload.chatUrl);
+        }
+        if (payload.wsUrl) {
+          localStorage.setItem("wsUrl", payload.wsUrl);
+        }
+        if (!window.localforage) {
+          document.querySelector("h1").textContent = "Chargement incomplet.";
+          document.querySelector("p").textContent = "Veuillez reessayer.";
+          return;
+        }
+        window.localforage.config({ name: "OpenIM-Config" });
+        await window.localforage.setItem("IM_TOKEN", payload.imToken);
+        await window.localforage.setItem("IM_CHAT_TOKEN", payload.chatToken);
+        await window.localforage.setItem("IM_USERID", payload.userID);
+        window.location.href = "/";
+      }
+
+      bootstrap();
+    </script>
+  </body>
+</html>

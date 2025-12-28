@@ -37,6 +37,7 @@ services:
 
 networks:
   santia:
+    name: santia
 
 volumes:
   openemr_mysql_data:

@@ -36,6 +36,10 @@ services:
       dockerfile: frontend/Dockerfile
       args:
         REACT_APP_BACKEND_URL: ${PUBLIC_BACKEND_URL}
+        REACT_APP_OPENIM_WEB_URL: ${PUBLIC_OPENIM_WEB_URL}
+        REACT_APP_OPENIM_API_URL: ${PUBLIC_OPENIM_API_URL}
+        REACT_APP_OPENIM_CHAT_URL: ${PUBLIC_OPENIM_CHAT_URL}
+        REACT_APP_OPENIM_WS_URL: ${PUBLIC_OPENIM_WS_URL}
     container_name: santia-frontend
     restart: unless-stopped
     ports:
@@ -45,6 +49,7 @@ services:
 
 networks:
   santia:
+    name: santia
 
 volumes:
   mongo_data:

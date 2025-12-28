@@ -81,6 +81,7 @@ services:
 
 networks:
   santia:
+    name: santia
 
 volumes:
   jitsi_prosody_data:

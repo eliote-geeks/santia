@@ -51,8 +51,9 @@ if [ "$AUTO_START" = "1" ]; then
     -f deploy/docker-compose.app.yml \
     -f deploy/docker-compose.openemr.yml \
     -f deploy/docker-compose.jitsi.yml \
+    -f deploy/docker-compose.openim.yml \
     up -d
 else
   echo "Run this when ready:"
-  echo "$COMPOSE_CMD --env-file deploy/env -f deploy/docker-compose.app.yml -f deploy/docker-compose.openemr.yml -f deploy/docker-compose.jitsi.yml up -d"
+  echo "$COMPOSE_CMD --env-file deploy/env -f deploy/docker-compose.app.yml -f deploy/docker-compose.openemr.yml -f deploy/docker-compose.jitsi.yml -f deploy/docker-compose.openim.yml up -d"
 fi

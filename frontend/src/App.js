@@ -7,6 +7,7 @@ import { PatientProfile } from "./pages/PatientProfile";
 import { Admin } from "./pages/Admin";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
+import { Messagerie } from "./pages/Messagerie";
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/dossier" element={<PatientProfile />} />
           <Route path="/dossier/:id" element={<PatientProfile />} />
+          <Route path="/messagerie" element={<Messagerie />} />
           <Route path="/admin" element={<Admin />} />
         </Routes>
       </BrowserRouter>

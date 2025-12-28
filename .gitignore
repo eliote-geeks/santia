@@ -82,3 +82,4 @@ android-sdk/ -e
 *.env
 *.env.*
 deploy/env
+deploy/openim-data/

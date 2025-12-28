@@ -11,6 +11,7 @@ cp deploy/env.example deploy/env
 Edit `deploy/env` and set passwords, domains, and IPs.
 If you run OpenEMR with docker compose, set `OPENEMR_BASE_URL=http://openemr` so the backend can reach it on the internal network.
 Use `OPENEMR_SITE_ADDR` and `OPENEMR_REDIRECT_URI` for your public OpenEMR URL.
+Set `PUBLIC_OPENIM_WEB_URL` (and optional API/chat/ws URLs) if you want the patient "Messagerie" button to open a specific domain.
 
 ## 2) Start the app (frontend + backend + mongo)
 
@@ -61,23 +62,38 @@ For production, set:
 - `JITSI_ADVERTISE_IP` to your public IP
 - open UDP port `JITSI_JVB_PORT` (default 10000)
 
-## 5) Run all services together
+## 5) Start OpenIM (optional)
+
+```bash
+docker compose --env-file deploy/env -f deploy/docker-compose.openim.yml up -d
+```
+
+OpenIM will be available on:
+- Web: `http://YOUR_HOST:${OPENIM_WEB_PORT}`
+- Chat API: `http://YOUR_HOST:${OPENIM_CHAT_API_PORT}`
+- Admin API: `http://YOUR_HOST:${OPENIM_ADMIN_API_PORT}`
+
+SSO bridge page: `http://YOUR_HOST:${OPENIM_WEB_PORT}/sso.html`
+
+## 6) Run all services together
 
 ```bash
 docker compose --env-file deploy/env \
   -f deploy/docker-compose.app.yml \
   -f deploy/docker-compose.openemr.yml \
   -f deploy/docker-compose.jitsi.yml \
+  -f deploy/docker-compose.openim.yml \
   up -d
 ```
 
 ## Notes
 - The backend reads env variables from the container env (no .env file needed inside the image).
-- Update `OPENEMR_BASE_URL` and `JITSI_BASE_URL` to your public domains in production.
+- Update `OPENEMR_BASE_URL`, `JITSI_BASE_URL`, and OpenIM URLs to your public domains in production.
+- OpenIM web uses `/api`, `/chat`, and `/msg_gateway` on HTTPS; keep those routes in the reverse proxy.
 - For OpenEMR production, prefer OAuth Authorization Code Grant instead of password grant.
 
 ## Reverse proxy (Nginx + HTTPS)
-1) Point your DNS to the server: `santia.example.com`, `api.santia.example.com`, `emr.santia.example.com`, `meet.santia.example.com`.
+1) Point your DNS to the server: `santia.example.com`, `api.santia.example.com`, `emr.santia.example.com`, `meet.santia.example.com`, `chat.santia.example.com`.
 2) Copy `deploy/nginx/santia.conf` to `/etc/nginx/sites-available/santia.conf` and replace the domains.
 3) Enable it and reload Nginx:
 
