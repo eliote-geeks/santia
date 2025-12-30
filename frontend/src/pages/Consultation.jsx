@@ -1,16 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
-import { 
-  ArrowLeft, 
-  ArrowRight, 
-  Heart, 
-  ShieldAlert, 
-  Scale, 
-  Moon, 
-  Sparkles, 
+import {
+  ArrowLeft,
+  ArrowRight,
+  Heart,
+  ShieldAlert,
+  Scale,
+  Moon,
+  Sparkles,
   Baby,
   Check,
   AlertTriangle,
@@ -32,6 +32,9 @@ import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { getToken, authHeaders } from '../lib/auth';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
+const MEETING_BASE_URL = (process.env.REACT_APP_JITSI_URL || 'https://meet.jit.si').replace(/\/$/, '');
+const PAYMENT_AMOUNT = 10000;
+const BOOKING_STORAGE_KEY = 'santia_booking';
 
 const categories = [
   { id: 'sante-sexuelle', title: 'Santé sexuelle', icon: Heart, color: 'bg-rose-50', iconColor: 'text-rose-500' },
@@ -50,9 +53,58 @@ const durations = [
 ];
 
 const cities = [
-  'Douala', 'Yaoundé', 'Bamenda', 'Garoua', 'Maroua', 
+  'Douala', 'Yaoundé', 'Bamenda', 'Garoua', 'Maroua',
   'Bafoussam', 'Ngaoundéré', 'Bertoua', 'Kribi', 'Limbe', 'Autre'
 ];
+
+const paymentMethods = [
+  {
+    id: 'orange-money',
+    label: 'Orange Money',
+    helper: 'Paiement instantané via Orange',
+    accent: '#FF7900',
+    badge: 'OM'
+  },
+  {
+    id: 'mtn-momo',
+    label: 'MTN MoMo',
+    helper: 'Paiement instantané via MTN',
+    accent: '#FFCB05',
+    badge: 'MoMo'
+  }
+];
+
+const buildScheduleSlots = () => {
+  const slots = [];
+  const now = new Date();
+  const timeSlots = ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00'];
+
+  for (let dayOffset = 0; dayOffset < 5; dayOffset += 1) {
+    const baseDate = new Date(now);
+    baseDate.setDate(now.getDate() + dayOffset);
+    timeSlots.forEach((time) => {
+      const [hour, minute] = time.split(':').map(Number);
+      const slotDate = new Date(baseDate);
+      slotDate.setHours(hour, minute, 0, 0);
+      if (slotDate < now) return;
+      const label = `${slotDate.toLocaleDateString('fr-FR', {
+        weekday: 'short',
+        day: '2-digit',
+        month: 'short'
+      })} · ${time}`;
+      slots.push({
+        id: slotDate.toISOString(),
+        date: slotDate.toISOString().slice(0, 10),
+        time,
+        label
+      });
+    });
+  }
+
+  return slots.slice(0, 10);
+};
+
+const formatMoney = (amount) => new Intl.NumberFormat('fr-FR').format(amount);
 
 export const Consultation = () => {
   const navigate = useNavigate();
@@ -60,6 +112,8 @@ export const Consultation = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
+
+  const scheduleSlots = useMemo(() => buildScheduleSlots(), []);
 
   const [formData, setFormData] = useState({
     category: searchParams.get('category') || '',
@@ -72,6 +126,14 @@ export const Consultation = () => {
     phone: '',
     email: '',
     city: '',
+    scheduleSlotId: '',
+    scheduleDate: '',
+    scheduleTime: '',
+    scheduleLabel: '',
+    paymentMethod: '',
+    paymentPhone: '',
+    paymentConfirmed: false,
+    paymentReference: '',
     consent: false
   });
 
@@ -89,16 +151,42 @@ export const Consultation = () => {
     }
   }, [navigate]);
 
+  useEffect(() => {
+    if (formData.phone && !formData.paymentPhone) {
+      setFormData(prev => ({ ...prev, paymentPhone: prev.phone }));
+    }
+  }, [formData.phone, formData.paymentPhone]);
+
   const updateFormData = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(prev => {
+      const next = { ...prev, [field]: value };
+      if (['paymentMethod', 'paymentPhone'].includes(field)) {
+        next.paymentConfirmed = false;
+        next.paymentReference = '';
+      }
+      return next;
+    });
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: null }));
     }
   };
 
+  const selectScheduleSlot = (slot) => {
+    setFormData(prev => ({
+      ...prev,
+      scheduleSlotId: slot.id,
+      scheduleDate: slot.date,
+      scheduleTime: slot.time,
+      scheduleLabel: slot.label
+    }));
+    if (errors.scheduleSlotId) {
+      setErrors(prev => ({ ...prev, scheduleSlotId: null }));
+    }
+  };
+
   const validateStep = (step) => {
     const newErrors = {};
-    
+
     if (step === 1) {
       if (!formData.category) newErrors.category = 'Veuillez sélectionner un motif';
     } else if (step === 2) {
@@ -112,6 +200,11 @@ export const Consultation = () => {
       if (!formData.email.trim() || !/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Veuillez entrer un email valide';
       if (!formData.city) newErrors.city = 'Veuillez sélectionner votre ville';
     } else if (step === 4) {
+      if (!formData.scheduleSlotId) newErrors.scheduleSlotId = 'Veuillez choisir un créneau disponible';
+    } else if (step === 5) {
+      if (!formData.paymentMethod) newErrors.paymentMethod = 'Choisissez un moyen de paiement';
+      if (!formData.paymentPhone.trim()) newErrors.paymentPhone = 'Indiquez le numéro Mobile Money';
+      if (!formData.paymentConfirmed) newErrors.paymentConfirmed = 'Confirmez le paiement Mobile Money';
       if (!formData.consent) newErrors.consent = 'Vous devez accepter les conditions';
     }
 
@@ -121,7 +214,7 @@ export const Consultation = () => {
 
   const nextStep = () => {
     if (validateStep(currentStep)) {
-      setCurrentStep(prev => Math.min(prev + 1, 4));
+      setCurrentStep(prev => Math.min(prev + 1, 5));
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
@@ -131,8 +224,31 @@ export const Consultation = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleSimulatePayment = () => {
+    const newErrors = {};
+    if (!formData.paymentMethod) newErrors.paymentMethod = 'Choisissez un moyen de paiement';
+    if (!formData.paymentPhone.trim()) newErrors.paymentPhone = 'Indiquez le numéro Mobile Money';
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(prev => ({ ...prev, ...newErrors }));
+      return;
+    }
+    const reference = `SM-${Math.floor(100000 + Math.random() * 900000)}`;
+    setFormData(prev => ({
+      ...prev,
+      paymentConfirmed: true,
+      paymentReference: reference
+    }));
+    setErrors(prev => ({ ...prev, paymentConfirmed: null }));
+  };
+
+  const buildMeetingUrl = () => {
+    const slugBase = formData.category || 'consultation';
+    const random = Math.random().toString(36).slice(2, 8);
+    return `${MEETING_BASE_URL}/santia-${slugBase}-${random}`;
+  };
+
   const handleSubmit = async () => {
-    if (!validateStep(4)) return;
+    if (!validateStep(5)) return;
 
     setIsSubmitting(true);
     try {
@@ -142,7 +258,7 @@ export const Consultation = () => {
         duration: formData.duration,
         history: formData.history,
         name: formData.name,
-        age: parseInt(formData.age),
+        age: parseInt(formData.age, 10),
         gender: formData.gender,
         phone: formData.phone,
         email: formData.email,
@@ -153,6 +269,31 @@ export const Consultation = () => {
       await axios.post(`${API_URL}/api/intake`, payload, {
         headers: authHeaders()
       });
+
+      const meetingUrl = buildMeetingUrl();
+      const paymentLabel = paymentMethods.find((method) => method.id === formData.paymentMethod)?.label || formData.paymentMethod;
+      const booking = {
+        name: formData.name,
+        phone: formData.phone,
+        email: formData.email,
+        category: getCategoryLabel(formData.category),
+        symptoms: formData.symptoms,
+        schedule: {
+          date: formData.scheduleDate,
+          time: formData.scheduleTime,
+          label: formData.scheduleLabel
+        },
+        payment: {
+          method: paymentLabel,
+          amount: PAYMENT_AMOUNT,
+          phone: formData.paymentPhone,
+          reference: formData.paymentReference
+        },
+        meetingUrl,
+        createdAt: new Date().toISOString()
+      };
+      localStorage.setItem(BOOKING_STORAGE_KEY, JSON.stringify(booking));
+
       navigate('/confirmation');
     } catch (error) {
       console.error('Erreur lors de la soumission:', error);
@@ -170,7 +311,7 @@ export const Consultation = () => {
   return (
     <div className="min-h-screen bg-[#F8FAFC]" data-testid="consultation-page">
       <Navbar />
-      
+
       <main className="pt-24 pb-16 md:pt-28 md:pb-24">
         <div className="max-w-2xl mx-auto px-4 sm:px-6">
           {/* Urgence Disclaimer */}
@@ -186,18 +327,18 @@ export const Consultation = () => {
           {/* Progress Bar */}
           <div className="mb-8" data-testid="progress-bar">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-[#0A2540]">Étape {currentStep} sur 4</span>
-              <span className="text-sm text-[#64748B]">{Math.round((currentStep / 4) * 100)}%</span>
+              <span className="text-sm font-medium text-[#0A2540]">Étape {currentStep} sur 5</span>
+              <span className="text-sm text-[#64748B]">{Math.round((currentStep / 5) * 100)}%</span>
             </div>
             <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-              <div 
+              <div
                 className="h-full bg-[#2ECC71] rounded-full transition-all duration-500"
-                style={{ width: `${(currentStep / 4) * 100}%` }}
+                style={{ width: `${(currentStep / 5) * 100}%` }}
               ></div>
             </div>
             <div className="flex justify-between mt-3">
-              {['Motif', 'Symptômes', 'Infos', 'Récap'].map((label, index) => (
-                <div 
+              {['Motif', 'Problème', 'Infos', 'Rendez-vous', 'Paiement'].map((label, index) => (
+                <div
                   key={label}
                   className={`text-xs font-medium ${currentStep > index ? 'text-[#2ECC71]' : currentStep === index + 1 ? 'text-[#0A2540]' : 'text-[#64748B]'}`}
                 >
@@ -209,13 +350,13 @@ export const Consultation = () => {
 
           {/* Form Container */}
           <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 animate-fade-in" data-testid="form-container">
-            
+
             {/* Step 1: Category Selection */}
             {currentStep === 1 && (
               <div data-testid="step-1">
-                <h2 className="text-2xl font-bold text-[#0A2540] mb-2">Quel est le motif de votre consultation ?</h2>
+                <h2 className="text-2xl font-bold text-[#0A2540] mb-2">Choisissez votre pathologie</h2>
                 <p className="text-[#64748B] mb-6">Sélectionnez la catégorie qui correspond le mieux à votre besoin.</p>
-                
+
                 <div className="grid sm:grid-cols-2 gap-4">
                   {categories.map((cat) => {
                     const IconComponent = cat.icon;
@@ -225,8 +366,8 @@ export const Consultation = () => {
                         key={cat.id}
                         onClick={() => updateFormData('category', cat.id)}
                         className={`p-5 rounded-xl border-2 text-left transition-all duration-200 ${
-                          isSelected 
-                            ? 'border-[#2ECC71] bg-[#2ECC71]/5 ring-1 ring-[#2ECC71]' 
+                          isSelected
+                            ? 'border-[#2ECC71] bg-[#2ECC71]/5 ring-1 ring-[#2ECC71]'
                             : 'border-slate-200 hover:border-[#0A2540]/30 hover:bg-slate-50'
                         }`}
                         data-testid={`category-${cat.id}`}
@@ -251,9 +392,9 @@ export const Consultation = () => {
             {/* Step 2: Symptoms */}
             {currentStep === 2 && (
               <div data-testid="step-2">
-                <h2 className="text-2xl font-bold text-[#0A2540] mb-2">Décrivez vos symptômes</h2>
+                <h2 className="text-2xl font-bold text-[#0A2540] mb-2">Décrivez votre problème</h2>
                 <p className="text-[#64748B] mb-6">Plus vous êtes précis, mieux le médecin pourra vous aider.</p>
-                
+
                 <div className="space-y-6">
                   <div>
                     <Label htmlFor="symptoms" className="text-[#0A2540] font-medium mb-2 block">
@@ -321,7 +462,7 @@ export const Consultation = () => {
               <div data-testid="step-3">
                 <h2 className="text-2xl font-bold text-[#0A2540] mb-2">Vos informations</h2>
                 <p className="text-[#64748B] mb-6">Ces informations permettront au médecin de vous contacter.</p>
-                
+
                 <div className="space-y-5">
                   <div>
                     <Label htmlFor="name" className="text-[#0A2540] font-medium mb-2 block">Nom complet *</Label>
@@ -415,93 +556,164 @@ export const Consultation = () => {
               </div>
             )}
 
-            {/* Step 4: Recap */}
+            {/* Step 4: Schedule */}
             {currentStep === 4 && (
               <div data-testid="step-4">
-                <h2 className="text-2xl font-bold text-[#0A2540] mb-2">Récapitulatif</h2>
-                <p className="text-[#64748B] mb-6">Vérifiez vos informations avant de soumettre.</p>
-                
-                <div className="space-y-4 mb-6">
+                <h2 className="text-2xl font-bold text-[#0A2540] mb-2">Choisissez un créneau</h2>
+                <p className="text-[#64748B] mb-6">Sélectionnez la date et l'heure de votre consultation.</p>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  {scheduleSlots.map((slot) => (
+                    <button
+                      key={slot.id}
+                      type="button"
+                      onClick={() => selectScheduleSlot(slot)}
+                      className={`p-4 rounded-xl border-2 text-left transition-all duration-200 ${
+                        formData.scheduleSlotId === slot.id
+                          ? 'border-[#2ECC71] bg-[#2ECC71]/5 ring-1 ring-[#2ECC71]'
+                          : 'border-slate-200 hover:border-[#0A2540]/30 hover:bg-slate-50'
+                      }`}
+                    >
+                      <p className="font-semibold text-[#0A2540]">{slot.label}</p>
+                      <p className="text-xs text-[#64748B] mt-1">Consultation vidéo · 20 min</p>
+                    </button>
+                  ))}
+                </div>
+
+                {errors.scheduleSlotId && <p className="text-red-500 text-sm mt-4">{errors.scheduleSlotId}</p>}
+
+                <div className="mt-6 bg-[#0A2540]/5 border border-[#0A2540]/10 rounded-2xl p-5">
+                  <p className="text-sm text-[#0A2540] font-medium">Fuseau horaire : GMT+1 (Cameroun)</p>
+                  <p className="text-xs text-[#64748B] mt-2">Un SMS de confirmation vous sera envoyé avec le lien de consultation.</p>
+                </div>
+              </div>
+            )}
+
+            {/* Step 5: Payment */}
+            {currentStep === 5 && (
+              <div data-testid="step-5">
+                <h2 className="text-2xl font-bold text-[#0A2540] mb-2">Paiement Mobile Money</h2>
+                <p className="text-[#64748B] mb-6">Réglez votre consultation via Orange Money ou MTN MoMo.</p>
+
+                <div className="space-y-6">
+                  <div className="bg-[#F8FAFC] rounded-xl p-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-[#64748B]">Montant de la consultation</p>
+                      <p className="text-2xl font-bold text-[#0A2540]">{formatMoney(PAYMENT_AMOUNT)} FCFA</p>
+                    </div>
+                    <div className="text-xs text-[#2ECC71] font-medium">Paiement sécurisé</div>
+                  </div>
+
+                  <div>
+                    <Label className="text-[#0A2540] font-medium mb-3 block">Choisissez votre opérateur *</Label>
+                    <RadioGroup
+                      value={formData.paymentMethod}
+                      onValueChange={(value) => updateFormData('paymentMethod', value)}
+                      className="grid sm:grid-cols-2 gap-4"
+                      data-testid="payment-methods"
+                    >
+                      {paymentMethods.map((method) => (
+                        <div key={method.id} className="flex items-center">
+                          <RadioGroupItem value={method.id} id={method.id} className="peer sr-only" />
+                          <Label
+                            htmlFor={method.id}
+                            className={`flex-1 p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 ${
+                              formData.paymentMethod === method.id
+                                ? 'border-[#2ECC71] bg-[#2ECC71]/5'
+                                : 'border-slate-200 hover:border-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div
+                                className="w-12 h-12 rounded-xl flex items-center justify-center text-white text-sm font-bold"
+                                style={{ backgroundColor: method.accent }}
+                              >
+                                {method.badge}
+                              </div>
+                              <div>
+                                <p className="font-semibold text-[#0A2540]">{method.label}</p>
+                                <p className="text-xs text-[#64748B]">{method.helper}</p>
+                              </div>
+                            </div>
+                          </Label>
+                        </div>
+                      ))}
+                    </RadioGroup>
+                    {errors.paymentMethod && <p className="text-red-500 text-sm mt-1">{errors.paymentMethod}</p>}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="paymentPhone" className="text-[#0A2540] font-medium mb-2 block">Numéro Mobile Money *</Label>
+                    <Input
+                      id="paymentPhone"
+                      type="tel"
+                      placeholder="+237 6XX XXX XXX"
+                      value={formData.paymentPhone}
+                      onChange={(e) => updateFormData('paymentPhone', e.target.value)}
+                      className="input-santia"
+                      data-testid="payment-phone"
+                    />
+                    {errors.paymentPhone && <p className="text-red-500 text-sm mt-1">{errors.paymentPhone}</p>}
+                  </div>
+
+                  <div className="bg-[#0A2540]/5 border border-[#0A2540]/10 rounded-2xl p-5">
+                    <p className="text-sm text-[#0A2540] font-medium">Simulation de paiement</p>
+                    <p className="text-xs text-[#64748B] mt-2">
+                      Cliquez sur “Simuler le paiement” pour continuer (pas de débit réel).
+                    </p>
+                    <div className="mt-4 flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                      <Button type="button" className="btn-primary" onClick={handleSimulatePayment}>
+                        Simuler le paiement
+                      </Button>
+                      {formData.paymentConfirmed && (
+                        <span className="text-sm text-[#2ECC71] font-medium">
+                          Paiement confirmé · Réf {formData.paymentReference}
+                        </span>
+                      )}
+                    </div>
+                    {errors.paymentConfirmed && <p className="text-red-500 text-sm mt-2">{errors.paymentConfirmed}</p>}
+                  </div>
+
                   <div className="bg-[#F8FAFC] rounded-xl p-4">
-                    <h3 className="font-semibold text-[#0A2540] mb-3">Consultation</h3>
+                    <h3 className="font-semibold text-[#0A2540] mb-3">Récapitulatif</h3>
                     <div className="grid gap-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-[#64748B]">Motif</span>
                         <span className="font-medium text-[#0A2540]">{getCategoryLabel(formData.category)}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-[#64748B]">Durée</span>
-                        <span className="font-medium text-[#0A2540]">
-                          {durations.find(d => d.value === formData.duration)?.label || formData.duration}
-                        </span>
+                        <span className="text-[#64748B]">Créneau</span>
+                        <span className="font-medium text-[#0A2540]">{formData.scheduleLabel || '—'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-[#64748B]">Paiement</span>
+                        <span className="font-medium text-[#0A2540]">{formatMoney(PAYMENT_AMOUNT)} FCFA</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="bg-[#F8FAFC] rounded-xl p-4">
-                    <h3 className="font-semibold text-[#0A2540] mb-3">Symptômes</h3>
-                    <p className="text-sm text-[#64748B]">{formData.symptoms}</p>
-                    {formData.history && (
-                      <>
-                        <h4 className="font-medium text-[#0A2540] mt-3 mb-1">Antécédents</h4>
-                        <p className="text-sm text-[#64748B]">{formData.history}</p>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="bg-[#F8FAFC] rounded-xl p-4">
-                    <h3 className="font-semibold text-[#0A2540] mb-3">Informations personnelles</h3>
-                    <div className="grid gap-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-[#64748B]">Nom</span>
-                        <span className="font-medium text-[#0A2540]">{formData.name}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-[#64748B]">Âge</span>
-                        <span className="font-medium text-[#0A2540]">{formData.age} ans</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-[#64748B]">Sexe</span>
-                        <span className="font-medium text-[#0A2540] capitalize">{formData.gender}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-[#64748B]">Téléphone</span>
-                        <span className="font-medium text-[#0A2540]">{formData.phone}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-[#64748B]">Email</span>
-                        <span className="font-medium text-[#0A2540]">{formData.email}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-[#64748B]">Ville</span>
-                        <span className="font-medium text-[#0A2540]">{formData.city}</span>
-                      </div>
+                  <div className="border-t border-slate-200 pt-6">
+                    <div className="flex items-start gap-3">
+                      <Checkbox
+                        id="consent"
+                        checked={formData.consent}
+                        onCheckedChange={(checked) => updateFormData('consent', checked)}
+                        data-testid="consent-checkbox"
+                      />
+                      <Label htmlFor="consent" className="text-sm text-[#64748B] leading-relaxed cursor-pointer">
+                        J'accepte que mes données soient traitées par Santia dans le cadre de ma consultation médicale.
+                        Je comprends que ce service ne remplace pas une consultation en urgence.
+                      </Label>
                     </div>
+                    {errors.consent && <p className="text-red-500 text-sm mt-2">{errors.consent}</p>}
                   </div>
-                </div>
 
-                {/* Consent */}
-                <div className="border-t border-slate-200 pt-6">
-                  <div className="flex items-start gap-3">
-                    <Checkbox
-                      id="consent"
-                      checked={formData.consent}
-                      onCheckedChange={(checked) => updateFormData('consent', checked)}
-                      data-testid="consent-checkbox"
-                    />
-                    <Label htmlFor="consent" className="text-sm text-[#64748B] leading-relaxed cursor-pointer">
-                      J'accepte que mes données soient traitées par Santia dans le cadre de ma consultation médicale. 
-                      Je comprends que ce service ne remplace pas une consultation en urgence.
-                    </Label>
-                  </div>
-                  {errors.consent && <p className="text-red-500 text-sm mt-2">{errors.consent}</p>}
+                  {errors.submit && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                      <p className="text-red-700 text-sm">{errors.submit}</p>
+                    </div>
+                  )}
                 </div>
-
-                {errors.submit && (
-                  <div className="bg-red-50 border border-red-200 rounded-xl p-4 mt-4">
-                    <p className="text-red-700 text-sm">{errors.submit}</p>
-                  </div>
-                )}
               </div>
             )}
 
@@ -521,7 +733,7 @@ export const Consultation = () => {
                 <div></div>
               )}
 
-              {currentStep < 4 ? (
+              {currentStep < 5 ? (
                 <Button
                   onClick={nextStep}
                   className="btn-primary flex items-center gap-2"
@@ -540,11 +752,11 @@ export const Consultation = () => {
                   {isSubmitting ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      Envoi en cours...
+                      Validation en cours...
                     </>
                   ) : (
                     <>
-                      Soumettre ma demande
+                      Payer et confirmer
                       <Check className="w-4 h-4" />
                     </>
                   )}

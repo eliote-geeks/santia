@@ -235,6 +235,28 @@ export const PatientProfile = () => {
                 )}
               </div>
 
+              {intake.assigned_doctor && (
+                <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
+                  <h2 className="text-xl font-bold text-[#0A2540] mb-4">Votre medecin</h2>
+                  <div className="grid md:grid-cols-2 gap-6 text-sm">
+                    <div>
+                      <p className="text-lg font-semibold text-[#0A2540]">Dr {intake.assigned_doctor.name}</p>
+                      <p className="text-sm text-[#64748B]">{intake.assigned_doctor.specialty}</p>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-4 h-4 text-[#2ECC71]" />
+                        <span className="text-[#64748B]">{intake.assigned_doctor.phone}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Mail className="w-4 h-4 text-[#2ECC71]" />
+                        <span className="text-[#64748B]">{intake.assigned_doctor.email}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-4">
                   <div>

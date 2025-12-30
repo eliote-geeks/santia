@@ -46,9 +46,23 @@ export const Admin = () => {
   const [intakes, setIntakes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [doctors, setDoctors] = useState([]);
+  const [doctorLoading, setDoctorLoading] = useState(true);
+  const [doctorError, setDoctorError] = useState('');
+  const [doctorSuccess, setDoctorSuccess] = useState('');
+  const [doctorForm, setDoctorForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    specialty: '',
+    openemr_provider_id: ''
+  });
+  const [doctorSubmitting, setDoctorSubmitting] = useState(false);
   const [scheduleValues, setScheduleValues] = useState({});
   const [meetingOverrides, setMeetingOverrides] = useState({});
   const [savingId, setSavingId] = useState(null);
+  const [assignValues, setAssignValues] = useState({});
+  const [assigningId, setAssigningId] = useState(null);
 
   const loadIntakes = async () => {
     setLoading(true);
@@ -63,8 +77,22 @@ export const Admin = () => {
     }
   };
 
+  const loadDoctors = async () => {
+    setDoctorLoading(true);
+    setDoctorError('');
+    try {
+      const response = await axios.get(`${API_URL}/api/doctors`);
+      setDoctors(response.data || []);
+    } catch (err) {
+      setDoctorError('Impossible de charger les medecins.');
+    } finally {
+      setDoctorLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadIntakes();
+    loadDoctors();
   }, []);
 
   const handleScheduleChange = (id, value) => {
@@ -73,6 +101,68 @@ export const Admin = () => {
 
   const handleMeetingChange = (id, value) => {
     setMeetingOverrides((prev) => ({ ...prev, [id]: value }));
+  };
+
+  const handleDoctorFormChange = (field, value) => {
+    setDoctorForm((prev) => ({ ...prev, [field]: value }));
+    if (doctorError) setDoctorError('');
+    if (doctorSuccess) setDoctorSuccess('');
+  };
+
+  const handleCreateDoctor = async (event) => {
+    event.preventDefault();
+    setDoctorSubmitting(true);
+    setDoctorError('');
+    setDoctorSuccess('');
+    try {
+      const response = await axios.post(`${API_URL}/api/doctors`, doctorForm);
+      const { openim_password, openim_created, ...doctor } = response.data || {};
+      setDoctors((prev) => [doctor, ...prev]);
+      setDoctorForm({
+        name: '',
+        email: '',
+        phone: '',
+        specialty: '',
+        openemr_provider_id: ''
+      });
+      if (openim_created && openim_password) {
+        setDoctorSuccess(`Medecin cree. Mot de passe OpenIM: ${openim_password}`);
+      } else {
+        setDoctorSuccess('Medecin cree. OpenIM sera connecte plus tard.');
+      }
+    } catch (err) {
+      setDoctorError('Impossible de creer le medecin.');
+    } finally {
+      setDoctorSubmitting(false);
+    }
+  };
+
+  const handleAssignChange = (id, value) => {
+    setAssignValues((prev) => ({ ...prev, [id]: value }));
+  };
+
+  const handleAssignDoctor = async (id) => {
+    const current = intakes.find((item) => item.id === id);
+    const doctorId = assignValues[id] ?? current?.assigned_doctor_id;
+    if (!doctorId) {
+      setError('Veuillez choisir un medecin a assigner.');
+      return;
+    }
+    setAssigningId(id);
+    setError('');
+    try {
+      const response = await axios.patch(`${API_URL}/api/intakes/${id}/assign`, { doctor_id: doctorId });
+      setIntakes((prev) => prev.map((item) => (item.id === id ? response.data : item)));
+      setAssignValues((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    } catch (err) {
+      setError('L assignation a echoue.');
+    } finally {
+      setAssigningId(null);
+    }
   };
 
   const handleSchedule = async (id) => {
@@ -115,6 +205,122 @@ export const Admin = () => {
             </Button>
           </div>
 
+          <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 mb-8">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-[#0A2540]">Equipe medicale</h2>
+                <p className="text-sm text-[#64748B]">Ajoutez les medecins et assignez-les aux demandes.</p>
+              </div>
+              <Button onClick={loadDoctors} variant="outline" className="flex items-center gap-2">
+                <RefreshCw className="w-4 h-4" />
+                Rafraichir medecins
+              </Button>
+            </div>
+
+            {doctorError && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 mt-4 text-sm text-red-700">
+                {doctorError}
+              </div>
+            )}
+
+            {doctorSuccess && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mt-4 text-sm text-emerald-700">
+                {doctorSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleCreateDoctor} className="mt-6 grid md:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-[#0A2540]">Nom complet</label>
+                <input
+                  type="text"
+                  className="input-santia"
+                  placeholder="Dr Nana Kouam"
+                  value={doctorForm.name}
+                  onChange={(event) => handleDoctorFormChange('name', event.target.value)}
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-[#0A2540]">Specialite</label>
+                <input
+                  type="text"
+                  className="input-santia"
+                  placeholder="Addictologie, sexologie, nutrition..."
+                  value={doctorForm.specialty}
+                  onChange={(event) => handleDoctorFormChange('specialty', event.target.value)}
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-[#0A2540]">Email</label>
+                <input
+                  type="email"
+                  className="input-santia"
+                  placeholder="medecin@santia.cm"
+                  value={doctorForm.email}
+                  onChange={(event) => handleDoctorFormChange('email', event.target.value)}
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-[#0A2540]">Telephone</label>
+                <input
+                  type="tel"
+                  className="input-santia"
+                  placeholder="+237 6 99 00 00 00"
+                  value={doctorForm.phone}
+                  onChange={(event) => handleDoctorFormChange('phone', event.target.value)}
+                  required
+                />
+              </div>
+              <div className="grid gap-2 md:col-span-2">
+                <label className="text-sm font-medium text-[#0A2540]">ID OpenEMR (optionnel)</label>
+                <input
+                  type="text"
+                  className="input-santia"
+                  placeholder="Ex: 3"
+                  value={doctorForm.openemr_provider_id}
+                  onChange={(event) => handleDoctorFormChange('openemr_provider_id', event.target.value)}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <Button type="submit" className="btn-green px-6 py-3" disabled={doctorSubmitting}>
+                  {doctorSubmitting ? 'Creation...' : 'Ajouter le medecin'}
+                </Button>
+              </div>
+            </form>
+
+            <div className="mt-6">
+              <h3 className="text-sm font-semibold text-[#0A2540] mb-3">Medecins actifs</h3>
+              {doctorLoading ? (
+                <div className="flex items-center gap-2 text-sm text-[#64748B]">
+                  <Loader2 className="w-4 h-4 animate-spin text-[#2ECC71]" />
+                  Chargement des medecins...
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {doctors.length === 0 && (
+                    <div className="text-sm text-[#64748B]">Aucun medecin enregistre pour le moment.</div>
+                  )}
+                  {doctors.map((doctor) => (
+                    <div key={doctor.id} className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border border-slate-200 rounded-xl px-4 py-3">
+                      <div>
+                        <p className="font-semibold text-[#0A2540]">Dr {doctor.name}</p>
+                        <p className="text-sm text-[#64748B]">{doctor.specialty} · {doctor.email}</p>
+                      </div>
+                      <div className="text-xs text-[#64748B] space-y-1">
+                        <p>Tel: {doctor.phone}</p>
+                        {doctor.openemr_provider_id && <p>OpenEMR: {doctor.openemr_provider_id}</p>}
+                        <p>{doctor.openim_user_id ? 'OpenIM actif' : 'OpenIM non lie'}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 text-sm text-red-700">
               {error}
@@ -144,6 +350,11 @@ export const Admin = () => {
                         </span>
                       </div>
                       <p className="text-sm text-[#64748B]">{categoryLabels[intake.category] || intake.category} • {intake.city}</p>
+                      {intake.assigned_doctor && (
+                        <p className="text-xs text-[#64748B] mt-1">
+                          Medecin: Dr {intake.assigned_doctor.name} · {intake.assigned_doctor.specialty}
+                        </p>
+                      )}
                       <p className="text-xs text-[#94A3B8] mt-1">ID: {intake.id}</p>
                     </div>
                     <Link to={`/dossier/${intake.id}`} className="text-sm text-[#0A2540] hover:text-[#2ECC71] transition-colors">
@@ -172,6 +383,31 @@ export const Admin = () => {
                     </div>
 
                     <div className="space-y-3">
+                      <div className="grid gap-3">
+                        <label className="text-sm font-medium text-[#0A2540]">Medecin assigne</label>
+                        <select
+                          className="input-santia"
+                          value={assignValues[intake.id] ?? intake.assigned_doctor_id ?? ''}
+                          onChange={(e) => handleAssignChange(intake.id, e.target.value)}
+                        >
+                          <option value="">Choisir un medecin</option>
+                          {doctors.map((doctor) => (
+                            <option key={doctor.id} value={doctor.id}>
+                              Dr {doctor.name} · {doctor.specialty}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex flex-wrap gap-3">
+                        <Button
+                          onClick={() => handleAssignDoctor(intake.id)}
+                          disabled={assigningId === intake.id || doctors.length === 0}
+                          variant="outline"
+                          className="px-6 py-3"
+                        >
+                          {assigningId === intake.id ? 'Assignation...' : 'Assigner'}
+                        </Button>
+                      </div>
                       <div className="grid gap-3">
                         <label className="text-sm font-medium text-[#0A2540]">Date et heure</label>
                         <input

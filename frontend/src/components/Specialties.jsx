@@ -58,10 +58,10 @@ export const Specialties = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12 md:mb-16">
           <h2 className="text-3xl md:text-4xl font-bold text-[#0A2540] mb-4 animate-fade-in-up" data-testid="specialties-title">
-            Nos spécialités
+            Choisissez votre pathologie
           </h2>
           <p className="text-lg text-[#64748B] max-w-2xl mx-auto animate-fade-in-up stagger-1" data-testid="specialties-subtitle">
-            Consultez un médecin spécialiste pour des problèmes de santé courants, en toute discrétion.
+            Perte de poids, santé sexuelle, addictions, sommeil... Sélectionnez la catégorie qui vous concerne.
           </p>
         </div>
 

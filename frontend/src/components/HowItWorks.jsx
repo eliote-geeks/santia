@@ -1,23 +1,35 @@
-import { ClipboardList, MessageSquare, Phone } from 'lucide-react';
+import { ClipboardList, MessageSquare, Calendar, Smartphone, Video } from 'lucide-react';
 
 const steps = [
   {
     number: '01',
-    title: 'Choisissez votre motif',
-    description: 'Sélectionnez la raison de votre consultation parmi nos spécialités.',
+    title: 'Choisissez votre pathologie',
+    description: 'Perte de poids, sexo, addictions… sélectionnez votre besoin.',
     icon: ClipboardList
   },
   {
     number: '02',
-    title: 'Répondez aux questions',
-    description: 'Décrivez vos symptômes et vos antécédents en quelques minutes.',
+    title: 'Décrivez votre problème',
+    description: 'Expliquez vos symptômes et vos antécédents.',
     icon: MessageSquare
   },
   {
     number: '03',
-    title: 'Un médecin vous contacte',
-    description: 'Un médecin analyse votre dossier et vous rappelle sous 15 minutes.',
-    icon: Phone
+    title: 'Choisissez un créneau',
+    description: 'Sélectionnez la date et l’heure qui vous conviennent.',
+    icon: Calendar
+  },
+  {
+    number: '04',
+    title: 'Payez par Mobile Money',
+    description: 'Orange Money ou MTN MoMo, paiement sécurisé.',
+    icon: Smartphone
+  },
+  {
+    number: '05',
+    title: 'Recevez le SMS & rejoignez',
+    description: 'Lien de consultation vidéo envoyé par SMS.',
+    icon: Video
   }
 ];
 
@@ -30,27 +42,25 @@ export const HowItWorks = () => {
             Comment ça marche ?
           </h2>
           <p className="text-lg text-[#64748B] max-w-2xl mx-auto animate-fade-in-up stagger-1" data-testid="how-it-works-subtitle">
-            3 étapes simples pour consulter un médecin en ligne
+            5 étapes simples pour consulter en ligne
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 lg:gap-12" data-testid="steps-grid">
+        <div className="grid md:grid-cols-2 xl:grid-cols-5 gap-8 lg:gap-12" data-testid="steps-grid">
           {steps.map((step, index) => {
             const IconComponent = step.icon;
             return (
-              <div 
-                key={step.number} 
+              <div
+                key={step.number}
                 className={`relative text-center animate-fade-in-up stagger-${index + 1}`}
                 data-testid={`step-${index + 1}`}
               >
-                {/* Connector line (hidden on mobile and last item) */}
                 {index < steps.length - 1 && (
-                  <div className="hidden md:block absolute top-16 left-[60%] w-[80%] h-0.5 bg-[#E2E8F0]">
+                  <div className="hidden xl:block absolute top-16 left-[60%] w-[80%] h-0.5 bg-[#E2E8F0]">
                     <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 bg-[#2ECC71] rounded-full"></div>
                   </div>
                 )}
-                
-                {/* Step number and icon */}
+
                 <div className="relative inline-block mb-6">
                   <div className="w-24 h-24 bg-[#0A2540] rounded-2xl flex items-center justify-center mx-auto shadow-lg">
                     <IconComponent className="w-10 h-10 text-white" />
@@ -67,10 +77,9 @@ export const HowItWorks = () => {
           })}
         </div>
 
-        {/* Image section */}
         <div className="mt-16 relative rounded-3xl overflow-hidden animate-fade-in-up stagger-4" data-testid="how-it-works-image">
-          <img 
-            src="https://images.unsplash.com/photo-1631558554184-319c88f4f8a4?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200" 
+          <img
+            src="https://images.unsplash.com/photo-1631558554184-319c88f4f8a4?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200"
             alt="Consultation médicale"
             className="w-full h-64 md:h-80 object-cover"
           />

@@ -9,6 +9,8 @@ from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional
 import uuid
 import hashlib
+import secrets
+import string
 from datetime import datetime, timezone, timedelta
 import asyncio
 import time
@@ -41,6 +43,12 @@ AUTH_ALGORITHM = os.environ.get("AUTH_ALGORITHM", "HS256")
 AUTH_TOKEN_EXPIRE_MINUTES = int(os.environ.get("AUTH_TOKEN_EXPIRE_MINUTES", "10080"))
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def parse_cors_origins() -> List[str]:
+    raw = os.environ.get("CORS_ORIGINS", "*")
+    if raw.strip() == "*":
+        return ["*"]
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
 class OpenEMRError(Exception):
     pass
@@ -122,6 +130,10 @@ def build_whatsapp_link(intake: dict, scheduled_at: datetime, meeting_url: str) 
         "Merci."
     )
     return f"https://wa.me/{phone}?text={quote(message)}"
+
+def generate_temp_password(length: int = 10) -> str:
+    alphabet = string.ascii_letters + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(length))
 
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
@@ -268,7 +280,13 @@ class OpenEMRClient:
             raise OpenEMRError(f"Patient id missing: {payload}")
         return str(pid)
 
-    def create_appointment(self, pid: str, intake: "IntakeCreate | dict", scheduled_at: Optional[datetime] = None) -> str:
+    def create_appointment(
+        self,
+        pid: str,
+        intake: "IntakeCreate | dict",
+        scheduled_at: Optional[datetime] = None,
+        provider_id: Optional[str] = None,
+    ) -> str:
         when = scheduled_at or datetime.now()
         if when.tzinfo is not None:
             when = when.astimezone().replace(tzinfo=None)
@@ -284,6 +302,7 @@ class OpenEMRClient:
             f"Email: {intake_value(intake, 'email')}",
         ]
         comment = "\n".join(comment_lines)[:2000]
+        provider = provider_id or self.provider_id
         payload = {
             "pc_catid": str(self.appt_category_id),
             "pc_title": self.appt_title,
@@ -294,7 +313,7 @@ class OpenEMRClient:
             "pc_startTime": appt_time,
             "pc_facility": str(self.facility_id),
             "pc_billing_location": str(self.billing_location_id),
-            "pc_aid": str(self.provider_id),
+            "pc_aid": str(provider),
         }
         response = requests.post(
             f"{self._api_base()}/patient/{pid}/appointment",
@@ -480,6 +499,40 @@ class IntakeCreate(BaseModel):
     city: str
     consent: bool
 
+class DoctorCreate(BaseModel):
+    name: str
+    email: EmailStr
+    phone: str
+    specialty: str
+    openemr_provider_id: Optional[str] = None
+
+class DoctorResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str
+    name: str
+    email: EmailStr
+    phone: str
+    specialty: str
+    openemr_provider_id: Optional[str] = None
+    openim_user_id: Optional[str] = None
+    created_at: str
+
+class DoctorCreateResponse(DoctorResponse):
+    openim_password: Optional[str] = None
+    openim_created: bool = False
+
+class DoctorSummary(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str
+    name: str
+    specialty: str
+    email: EmailStr
+    phone: str
+    openemr_provider_id: Optional[str] = None
+    openim_user_id: Optional[str] = None
+
 class IntakeResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
     
@@ -501,12 +554,17 @@ class IntakeResponse(BaseModel):
     meeting_url: Optional[str] = None
     whatsapp_link: Optional[str] = None
     user_id: Optional[str] = None
+    assigned_doctor_id: Optional[str] = None
+    assigned_doctor: Optional[DoctorSummary] = None
     openemr_patient_id: Optional[str] = None
     openemr_appointment_id: Optional[str] = None
 
 class IntakeScheduleUpdate(BaseModel):
     scheduled_at: datetime
     meeting_url: Optional[str] = None
+
+class IntakeAssignDoctor(BaseModel):
+    doctor_id: str
 
 # Add your routes to the router instead of directly to app
 @api_router.get("/")
@@ -592,12 +650,26 @@ async def login_user(input: UserLogin):
     openim_tokens = None
     if openim_client.can_login():
         try:
-            openim_payload = await asyncio.to_thread(
-                openim_client.login_user,
-                email,
-                input.password,
-            )
-            openim_tokens = build_openim_tokens(openim_payload)
+            if not user.get("openim_user_id") and openim_client.can_register():
+                try:
+                    openim_payload = await asyncio.to_thread(
+                        openim_client.register_user,
+                        user.get("name", "").strip() or "Patient",
+                        email,
+                        input.password,
+                    )
+                    openim_tokens = build_openim_tokens(openim_payload)
+                except OpenIMError as exc:
+                    logger.warning("OpenIM auto-register failed: %s", exc)
+
+            if not openim_tokens:
+                openim_payload = await asyncio.to_thread(
+                    openim_client.login_user,
+                    email,
+                    input.password,
+                )
+                openim_tokens = build_openim_tokens(openim_payload)
+
             if openim_tokens and user.get("openim_user_id") != openim_tokens.user_id:
                 await db.users.update_one(
                     {"id": user["id"]},
@@ -616,6 +688,67 @@ async def login_user(input: UserLogin):
 @api_router.get("/auth/me", response_model=UserResponse)
 async def get_me(current_user: dict = Depends(get_current_user)):
     return UserResponse(**sanitize_user(current_user))
+
+@api_router.get("/doctors", response_model=List[DoctorResponse])
+async def get_doctors():
+    if db is None:
+        raise HTTPException(status_code=503, detail="Base de donnees indisponible")
+    doctors = (
+        await db.doctors.find({}, {"_id": 0})
+        .sort("created_at", -1)
+        .to_list(1000)
+    )
+    return doctors
+
+@api_router.post("/doctors", response_model=DoctorCreateResponse)
+async def create_doctor(input: DoctorCreate):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Base de donnees indisponible")
+    email = input.email.lower()
+    existing = await db.doctors.find_one({"email": email})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email deja utilise")
+
+    doctor_id = str(uuid.uuid4())
+    created_at = datetime.now(timezone.utc).isoformat()
+    openemr_provider_id = input.openemr_provider_id.strip() if input.openemr_provider_id else None
+    openim_user_id = None
+    openim_password = None
+    openim_created = False
+
+    if openim_client.can_register():
+        temp_password = generate_temp_password()
+        try:
+            openim_payload = await asyncio.to_thread(
+                openim_client.register_user,
+                input.name.strip(),
+                email,
+                temp_password,
+            )
+            openim_tokens = build_openim_tokens(openim_payload)
+            if openim_tokens:
+                openim_user_id = openim_tokens.user_id
+                openim_password = temp_password
+                openim_created = True
+        except OpenIMError as exc:
+            logger.warning("OpenIM doctor register failed: %s", exc)
+
+    doctor_doc = {
+        "id": doctor_id,
+        "name": input.name.strip(),
+        "email": email,
+        "phone": input.phone.strip(),
+        "specialty": input.specialty.strip(),
+        "openemr_provider_id": openemr_provider_id,
+        "openim_user_id": openim_user_id,
+        "created_at": created_at,
+    }
+    await db.doctors.insert_one(doctor_doc)
+    return DoctorCreateResponse(
+        **doctor_doc,
+        openim_password=openim_password,
+        openim_created=openim_created,
+    )
 
 # Intake Form Endpoint
 @api_router.post("/intake", response_model=IntakeResponse)
@@ -653,6 +786,8 @@ async def create_intake(input: IntakeCreate, current_user: dict = Depends(get_cu
         "meeting_url": None,
         "whatsapp_link": None,
         "user_id": current_user.get("id"),
+        "assigned_doctor_id": None,
+        "assigned_doctor": None,
         "openemr_patient_id": openemr_patient_id,
         "openemr_appointment_id": None,
     }
@@ -713,6 +848,9 @@ async def schedule_intake(intake_id: str, input: IntakeScheduleUpdate):
         "whatsapp_link": whatsapp_link,
     }
 
+    assigned_doctor = intake.get("assigned_doctor") or {}
+    provider_id = assigned_doctor.get("openemr_provider_id")
+
     if openemr_client.is_configured() and intake.get("openemr_patient_id") and not intake.get("openemr_appointment_id"):
         try:
             appt_id = await asyncio.to_thread(
@@ -720,11 +858,41 @@ async def schedule_intake(intake_id: str, input: IntakeScheduleUpdate):
                 intake["openemr_patient_id"],
                 intake,
                 input.scheduled_at,
+                provider_id,
             )
             update_fields["openemr_appointment_id"] = appt_id
         except OpenEMRError as exc:
             logger.error("OpenEMR appointment scheduling failed: %s", exc)
             raise HTTPException(status_code=502, detail="Erreur lors de la creation du rendez-vous")
+
+    await db.intakes.update_one({"id": intake_id}, {"$set": update_fields})
+    updated = {**intake, **update_fields}
+    return updated
+
+@api_router.patch("/intakes/{intake_id}/assign", response_model=IntakeResponse)
+async def assign_doctor(intake_id: str, input: IntakeAssignDoctor):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Base de donnees indisponible")
+    intake = await db.intakes.find_one({"id": intake_id}, {"_id": 0})
+    if not intake:
+        raise HTTPException(status_code=404, detail="Dossier introuvable")
+    doctor = await db.doctors.find_one({"id": input.doctor_id}, {"_id": 0})
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Medecin introuvable")
+
+    doctor_summary = {
+        "id": doctor["id"],
+        "name": doctor["name"],
+        "specialty": doctor.get("specialty", ""),
+        "email": doctor.get("email", ""),
+        "phone": doctor.get("phone", ""),
+        "openemr_provider_id": doctor.get("openemr_provider_id"),
+        "openim_user_id": doctor.get("openim_user_id"),
+    }
+    update_fields = {
+        "assigned_doctor_id": doctor["id"],
+        "assigned_doctor": doctor_summary,
+    }
 
     await db.intakes.update_one({"id": intake_id}, {"$set": update_fields})
     updated = {**intake, **update_fields}
@@ -737,7 +905,7 @@ app.include_router(api_router)
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=parse_cors_origins(),
     allow_methods=["*"],
     allow_headers=["*"],
 )

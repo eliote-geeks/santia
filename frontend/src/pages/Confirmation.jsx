@@ -1,14 +1,44 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
-import { CheckCircle2, ArrowRight, Phone, Clock, MessageSquare, FileText } from 'lucide-react';
+import { CheckCircle2, ArrowRight, Clock, MessageSquare, Wallet, Video } from 'lucide-react';
 import { Button } from '../components/ui/button';
 
+const BOOKING_STORAGE_KEY = 'santia_booking';
+const DEFAULT_MEETING_URL = 'https://meet.jit.si/santia-demo';
+
+const formatMoney = (amount) => new Intl.NumberFormat('fr-FR').format(amount);
+
 export const Confirmation = () => {
+  const [booking, setBooking] = useState(null);
+
+  useEffect(() => {
+    const raw = localStorage.getItem(BOOKING_STORAGE_KEY);
+    if (!raw) return;
+    try {
+      setBooking(JSON.parse(raw));
+    } catch (error) {
+      setBooking(null);
+    }
+  }, []);
+
+  const scheduleLabel = booking?.schedule?.label || 'Aujourd\'hui 14:00';
+  const meetingUrl = booking?.meetingUrl || DEFAULT_MEETING_URL;
+  const paymentMethod = booking?.payment?.method || 'Orange Money';
+  const paymentAmount = booking?.payment?.amount || 10000;
+  const paymentReference = booking?.payment?.reference || 'SM-000000';
+  const patientName = booking?.name || 'Votre consultation';
+
+  const smsMessage = useMemo(() => {
+    const name = booking?.name || 'Patient';
+    return `Bonjour ${name}, votre consultation Santia est confirmée.\nCréneau: ${scheduleLabel}\nLien: ${meetingUrl}\nMerci.`;
+  }, [booking, scheduleLabel, meetingUrl]);
+
   return (
     <div className="min-h-screen bg-[#F8FAFC]" data-testid="confirmation-page">
       <Navbar />
-      
+
       <main className="pt-24 pb-16 md:pt-32 md:pb-24">
         <div className="max-w-2xl mx-auto px-4 sm:px-6">
           {/* Success Card */}
@@ -20,12 +50,12 @@ export const Confirmation = () => {
 
             {/* Title */}
             <h1 className="text-3xl md:text-4xl font-bold text-[#0A2540] mb-4 animate-fade-in-up stagger-2" data-testid="confirmation-title">
-              Merci !
+              Paiement confirmé
             </h1>
 
             {/* Subtitle */}
             <p className="text-lg text-[#64748B] mb-8 animate-fade-in-up stagger-3" data-testid="confirmation-subtitle">
-              Votre demande de consultation a bien été enregistrée. Un médecin va analyser votre dossier et vous contacter très prochainement.
+              Votre rendez-vous est validé. Un SMS vient d\'être envoyé avec le lien de consultation.
             </p>
 
             {/* Info Cards */}
@@ -34,58 +64,61 @@ export const Confirmation = () => {
                 <div className="w-10 h-10 bg-[#2ECC71]/10 rounded-lg flex items-center justify-center mx-auto mb-3">
                   <Clock className="w-5 h-5 text-[#2ECC71]" />
                 </div>
-                <h3 className="font-semibold text-[#0A2540] text-sm mb-1">Délai de réponse</h3>
-                <p className="text-xs text-[#64748B]">Sous 15 minutes</p>
+                <h3 className="font-semibold text-[#0A2540] text-sm mb-1">Créneau</h3>
+                <p className="text-xs text-[#64748B]">{scheduleLabel}</p>
               </div>
 
               <div className="bg-[#F8FAFC] rounded-xl p-4">
                 <div className="w-10 h-10 bg-[#2ECC71]/10 rounded-lg flex items-center justify-center mx-auto mb-3">
-                  <Phone className="w-5 h-5 text-[#2ECC71]" />
+                  <Wallet className="w-5 h-5 text-[#2ECC71]" />
                 </div>
-                <h3 className="font-semibold text-[#0A2540] text-sm mb-1">Contact</h3>
-                <p className="text-xs text-[#64748B]">Appel ou WhatsApp</p>
+                <h3 className="font-semibold text-[#0A2540] text-sm mb-1">Paiement</h3>
+                <p className="text-xs text-[#64748B]">{paymentMethod}</p>
               </div>
 
               <div className="bg-[#F8FAFC] rounded-xl p-4">
                 <div className="w-10 h-10 bg-[#2ECC71]/10 rounded-lg flex items-center justify-center mx-auto mb-3">
                   <MessageSquare className="w-5 h-5 text-[#2ECC71]" />
                 </div>
-                <h3 className="font-semibold text-[#0A2540] text-sm mb-1">Suivi</h3>
-                <p className="text-xs text-[#64748B]">Par email si besoin</p>
+                <h3 className="font-semibold text-[#0A2540] text-sm mb-1">SMS envoyé</h3>
+                <p className="text-xs text-[#64748B]">Lien de consultation</p>
               </div>
             </div>
 
-            {/* Patient Profile Link */}
+            {/* Consultation Link */}
             <div className="bg-[#0A2540]/5 border border-[#0A2540]/10 rounded-2xl p-5 mb-8 animate-fade-in-up stagger-4">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-[#0A2540]/10 rounded-full flex items-center justify-center">
-                    <FileText className="w-5 h-5 text-[#0A2540]" />
+                    <Video className="w-5 h-5 text-[#0A2540]" />
                   </div>
                   <div className="text-left">
-                    <p className="text-sm text-[#64748B]">Votre dossier patient</p>
-                    <p className="text-sm font-medium text-[#0A2540]">Suivez le statut et le lien de consultation</p>
+                    <p className="text-sm text-[#64748B]">Lien de consultation</p>
+                    <p className="text-sm font-medium text-[#0A2540]">{patientName}</p>
                   </div>
                 </div>
-                <Link to="/dossier" data-testid="profile-link">
-                  <Button className="btn-green px-6 py-3">Voir mon dossier</Button>
-                </Link>
+                <a href={meetingUrl} target="_blank" rel="noreferrer">
+                  <Button className="btn-green px-6 py-3">Rejoindre la visio</Button>
+                </a>
               </div>
             </div>
 
-            {/* Image */}
-            <div className="rounded-2xl overflow-hidden mb-8 animate-fade-in-up stagger-5" data-testid="confirmation-image">
-              <img 
-                src="https://images.unsplash.com/photo-1627130595904-ebeeb6540a93?crop=entropy&cs=srgb&fm=jpg&q=85&w=800" 
-                alt="Patient heureux"
-                className="w-full h-48 object-cover"
-              />
+            {/* SMS Preview */}
+            <div className="bg-[#F8FAFC] border border-slate-200 rounded-2xl p-5 text-left mb-8 animate-fade-in-up stagger-5">
+              <h3 className="text-sm font-semibold text-[#0A2540] mb-3">SMS de confirmation</h3>
+              <div className="bg-white border border-slate-200 rounded-xl p-4 text-sm text-[#475569] whitespace-pre-line">
+                {smsMessage}
+              </div>
+              <div className="mt-4 flex items-center justify-between text-xs text-[#64748B]">
+                <span>Montant payé : {formatMoney(paymentAmount)} FCFA</span>
+                <span>Réf : {paymentReference}</span>
+              </div>
             </div>
 
             {/* CTA Button */}
             <Link to="/" data-testid="back-to-home-button">
               <Button className="btn-primary inline-flex items-center gap-2">
-                Retour à l'accueil
+                Retour à l\'accueil
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>

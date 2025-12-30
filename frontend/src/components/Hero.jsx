@@ -30,21 +30,21 @@ export const Hero = () => {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 mb-12 animate-fade-in-up stagger-3">
-              <Link 
-                to="/consultation" 
+              <a 
+                href="#specialites" 
                 className="btn-primary inline-flex items-center justify-center gap-2 text-lg py-5 px-8"
                 data-testid="hero-cta-primary"
               >
-                Commencer une consultation
+                Choisir une pathologie
                 <ArrowRight className="w-5 h-5" />
-              </Link>
-              <a 
-                href="#comment-ca-marche" 
+              </a>
+              <Link 
+                to="/consultation" 
                 className="btn-secondary inline-flex items-center justify-center text-lg py-5 px-8"
                 data-testid="hero-cta-secondary"
               >
-                Comment ça marche ?
-              </a>
+                Démarrer la consultation
+              </Link>
             </div>
 
             {/* Trust Badges */}
