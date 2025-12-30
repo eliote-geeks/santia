@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, Phone } from 'lucide-react';
-import { getToken } from '../lib/auth';
+import { getToken, getUser } from '../lib/auth';
 
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
   const isAuthed = !!getToken();
+  const user = getUser();
+  const isAdmin = user?.role === 'admin';
 
   const isActive = (path) => location.pathname === path;
 
@@ -57,7 +59,7 @@ export const Navbar = () => {
             >
               FAQ
             </Link>
-            {isAuthed && (
+            {isAuthed && !isAdmin && (
               <Link
                 to="/dossier"
                 className={`text-sm font-medium transition-colors duration-200 ${
@@ -67,7 +69,17 @@ export const Navbar = () => {
                 Mon dossier
               </Link>
             )}
-            {isAuthed && (
+            {isAdmin && (
+              <Link
+                to="/admin"
+                className={`text-sm font-medium transition-colors duration-200 ${
+                  isActive('/admin') ? 'text-[#2ECC71]' : 'text-[#0A2540] hover:text-[#2ECC71]'
+                }`}
+              >
+                Administration
+              </Link>
+            )}
+            {isAuthed && !isAdmin && (
               <Link
                 to="/messagerie"
                 className={`text-sm font-medium transition-colors duration-200 ${
@@ -156,13 +168,35 @@ export const Navbar = () => {
               FAQ
             </Link>
             {isAuthed ? (
-              <Link
-                to="/dossier"
-                className="block py-3 text-lg font-medium text-[#0A2540]"
-                onClick={() => setIsOpen(false)}
-              >
-                Mon dossier
-              </Link>
+              <>
+                {!isAdmin && (
+                  <Link
+                    to="/dossier"
+                    className="block py-3 text-lg font-medium text-[#0A2540]"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Mon dossier
+                  </Link>
+                )}
+                {isAdmin && (
+                  <Link
+                    to="/admin"
+                    className="block py-3 text-lg font-medium text-[#0A2540]"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Administration
+                  </Link>
+                )}
+                {!isAdmin && (
+                  <Link
+                    to="/messagerie"
+                    className="block py-3 text-lg font-medium text-[#0A2540]"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Messagerie
+                  </Link>
+                )}
+              </>
             ) : (
               <>
                 <Link
@@ -180,15 +214,6 @@ export const Navbar = () => {
                   Creer un compte
                 </Link>
               </>
-            )}
-            {isAuthed && (
-              <Link
-                to="/messagerie"
-                className="block py-3 text-lg font-medium text-[#0A2540]"
-                onClick={() => setIsOpen(false)}
-              >
-                Messagerie
-              </Link>
             )}
             <div className="pt-4 border-t border-slate-100">
               {isAuthed ? (

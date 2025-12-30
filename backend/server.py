@@ -41,6 +41,10 @@ api_router = APIRouter(prefix="/api")
 AUTH_SECRET = os.environ.get("AUTH_SECRET", "change_me")
 AUTH_ALGORITHM = os.environ.get("AUTH_ALGORITHM", "HS256")
 AUTH_TOKEN_EXPIRE_MINUTES = int(os.environ.get("AUTH_TOKEN_EXPIRE_MINUTES", "10080"))
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
+ADMIN_NAME = os.environ.get("ADMIN_NAME", "Admin Santia")
+ADMIN_PHONE = os.environ.get("ADMIN_PHONE", "")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -174,6 +178,11 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
     if not user:
         raise HTTPException(status_code=401, detail="Utilisateur introuvable")
     return user
+
+async def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Acces reserve a l administration")
+    return current_user
 
 class OpenEMRClient:
     def __init__(self) -> None:
@@ -690,7 +699,7 @@ async def get_me(current_user: dict = Depends(get_current_user)):
     return UserResponse(**sanitize_user(current_user))
 
 @api_router.get("/doctors", response_model=List[DoctorResponse])
-async def get_doctors():
+async def get_doctors(_: dict = Depends(require_admin)):
     if db is None:
         raise HTTPException(status_code=503, detail="Base de donnees indisponible")
     doctors = (
@@ -701,7 +710,7 @@ async def get_doctors():
     return doctors
 
 @api_router.post("/doctors", response_model=DoctorCreateResponse)
-async def create_doctor(input: DoctorCreate):
+async def create_doctor(input: DoctorCreate, _: dict = Depends(require_admin)):
     if db is None:
         raise HTTPException(status_code=503, detail="Base de donnees indisponible")
     email = input.email.lower()
@@ -802,7 +811,7 @@ async def create_intake(input: IntakeCreate, current_user: dict = Depends(get_cu
     return IntakeResponse(**doc)
 
 @api_router.get("/intakes", response_model=List[IntakeResponse])
-async def get_intakes():
+async def get_intakes(_: dict = Depends(require_admin)):
     if db is None:
         raise HTTPException(status_code=503, detail="Base de donnees indisponible")
     intakes = await db.intakes.find({}, {"_id": 0}).to_list(1000)
@@ -826,12 +835,12 @@ async def get_intake(intake_id: str, current_user: dict = Depends(get_current_us
     intake = await db.intakes.find_one({"id": intake_id}, {"_id": 0})
     if not intake:
         raise HTTPException(status_code=404, detail="Dossier introuvable")
-    if intake.get("user_id") and intake.get("user_id") != current_user.get("id"):
+    if current_user.get("role") != "admin" and intake.get("user_id") and intake.get("user_id") != current_user.get("id"):
         raise HTTPException(status_code=403, detail="Acces refuse")
     return intake
 
 @api_router.patch("/intakes/{intake_id}/schedule", response_model=IntakeResponse)
-async def schedule_intake(intake_id: str, input: IntakeScheduleUpdate):
+async def schedule_intake(intake_id: str, input: IntakeScheduleUpdate, _: dict = Depends(require_admin)):
     if db is None:
         raise HTTPException(status_code=503, detail="Base de donnees indisponible")
     intake = await db.intakes.find_one({"id": intake_id}, {"_id": 0})
@@ -870,7 +879,7 @@ async def schedule_intake(intake_id: str, input: IntakeScheduleUpdate):
     return updated
 
 @api_router.patch("/intakes/{intake_id}/assign", response_model=IntakeResponse)
-async def assign_doctor(intake_id: str, input: IntakeAssignDoctor):
+async def assign_doctor(intake_id: str, input: IntakeAssignDoctor, _: dict = Depends(require_admin)):
     if db is None:
         raise HTTPException(status_code=503, detail="Base de donnees indisponible")
     intake = await db.intakes.find_one({"id": intake_id}, {"_id": 0})
@@ -921,3 +930,34 @@ logger = logging.getLogger(__name__)
 async def shutdown_db_client():
     if mongo_client is not None:
         mongo_client.close()
+
+@app.on_event("startup")
+async def ensure_admin_user():
+    if db is None or not ADMIN_EMAIL or not ADMIN_PASSWORD:
+        return
+    email = ADMIN_EMAIL.strip().lower()
+    if not email:
+        return
+    existing = await db.users.find_one({"email": email}, {"_id": 0})
+    password_hash = hash_password(ADMIN_PASSWORD)
+    if existing:
+        update_fields = {
+            "name": ADMIN_NAME.strip() or existing.get("name", "Admin"),
+            "phone": ADMIN_PHONE.strip() or existing.get("phone", ""),
+            "role": "admin",
+            "password_hash": password_hash,
+        }
+        await db.users.update_one({"id": existing["id"]}, {"$set": update_fields})
+        return
+
+    user_doc = {
+        "id": str(uuid.uuid4()),
+        "name": ADMIN_NAME.strip() or "Admin",
+        "email": email,
+        "phone": ADMIN_PHONE.strip(),
+        "password_hash": password_hash,
+        "role": "admin",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "openim_user_id": None,
+    }
+    await db.users.insert_one(user_doc)

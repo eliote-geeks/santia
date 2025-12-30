@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { Button } from '../components/ui/button';
 import { Calendar, Clock, ExternalLink, Loader2, MessageSquare, RefreshCw } from 'lucide-react';
+import { authHeaders, getToken, getUser } from '../lib/auth';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -43,6 +44,7 @@ const formatDateTime = (value) => {
 };
 
 export const Admin = () => {
+  const navigate = useNavigate();
   const [intakes, setIntakes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -68,10 +70,16 @@ export const Admin = () => {
     setLoading(true);
     setError('');
     try {
-      const response = await axios.get(`${API_URL}/api/intakes`);
+      const response = await axios.get(`${API_URL}/api/intakes`, { headers: authHeaders() });
       setIntakes(response.data || []);
     } catch (err) {
-      setError('Impossible de charger les demandes.');
+      if (err.response?.status === 401) {
+        setError('Veuillez vous connecter pour acceder a l administration.');
+      } else if (err.response?.status === 403) {
+        setError('Acces reserve a l administration.');
+      } else {
+        setError('Impossible de charger les demandes.');
+      }
     } finally {
       setLoading(false);
     }
@@ -81,19 +89,35 @@ export const Admin = () => {
     setDoctorLoading(true);
     setDoctorError('');
     try {
-      const response = await axios.get(`${API_URL}/api/doctors`);
+      const response = await axios.get(`${API_URL}/api/doctors`, { headers: authHeaders() });
       setDoctors(response.data || []);
     } catch (err) {
-      setDoctorError('Impossible de charger les medecins.');
+      if (err.response?.status === 401) {
+        setDoctorError('Veuillez vous connecter pour acceder a l administration.');
+      } else if (err.response?.status === 403) {
+        setDoctorError('Acces reserve a l administration.');
+      } else {
+        setDoctorError('Impossible de charger les medecins.');
+      }
     } finally {
       setDoctorLoading(false);
     }
   };
 
   useEffect(() => {
+    const token = getToken();
+    const user = getUser();
+    if (!token) {
+      navigate('/login?next=/admin');
+      return;
+    }
+    if (user?.role !== 'admin') {
+      setError('Acces reserve a l administration.');
+      return;
+    }
     loadIntakes();
     loadDoctors();
-  }, []);
+  }, [navigate]);
 
   const handleScheduleChange = (id, value) => {
     setScheduleValues((prev) => ({ ...prev, [id]: value }));
@@ -115,7 +139,7 @@ export const Admin = () => {
     setDoctorError('');
     setDoctorSuccess('');
     try {
-      const response = await axios.post(`${API_URL}/api/doctors`, doctorForm);
+      const response = await axios.post(`${API_URL}/api/doctors`, doctorForm, { headers: authHeaders() });
       const { openim_password, openim_created, ...doctor } = response.data || {};
       setDoctors((prev) => [doctor, ...prev]);
       setDoctorForm({
@@ -151,7 +175,11 @@ export const Admin = () => {
     setAssigningId(id);
     setError('');
     try {
-      const response = await axios.patch(`${API_URL}/api/intakes/${id}/assign`, { doctor_id: doctorId });
+      const response = await axios.patch(
+        `${API_URL}/api/intakes/${id}/assign`,
+        { doctor_id: doctorId },
+        { headers: authHeaders() }
+      );
       setIntakes((prev) => prev.map((item) => (item.id === id ? response.data : item)));
       setAssignValues((prev) => {
         const next = { ...prev };
@@ -179,7 +207,11 @@ export const Admin = () => {
       if (meetingOverrides[id]) {
         payload.meeting_url = meetingOverrides[id];
       }
-      const response = await axios.patch(`${API_URL}/api/intakes/${id}/schedule`, payload);
+      const response = await axios.patch(
+        `${API_URL}/api/intakes/${id}/schedule`,
+        payload,
+        { headers: authHeaders() }
+      );
       setIntakes((prev) => prev.map((item) => (item.id === id ? response.data : item)));
     } catch (err) {
       setError('La planification a echoue.');

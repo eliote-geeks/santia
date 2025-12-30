@@ -14,7 +14,7 @@ export const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const params = new URLSearchParams(location.search);
-  const nextPath = params.get('next') || '/dossier';
+  const nextPath = params.get('next');
 
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
@@ -32,7 +32,8 @@ export const Login = () => {
       const response = await axios.post(`${API_URL}/api/auth/login`, formData);
       setAuth(response.data.access_token, response.data.user);
       setOpenIM(response.data.openim);
-      navigate(nextPath);
+      const fallback = response.data.user?.role === 'admin' ? '/admin' : '/dossier';
+      navigate(nextPath || fallback);
     } catch (err) {
       setError('Identifiants invalides.');
     } finally {
