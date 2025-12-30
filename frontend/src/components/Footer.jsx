@@ -33,19 +33,19 @@ export const Footer = () => {
                 </Link>
               </li>
               <li>
-                <a href="#specialites" className="text-white/70 hover:text-[#2ECC71] transition-colors duration-200">
+                <Link to="/#specialites" className="text-white/70 hover:text-[#2ECC71] transition-colors duration-200">
                   Spécialités
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#comment-ca-marche" className="text-white/70 hover:text-[#2ECC71] transition-colors duration-200">
+                <Link to="/#comment-ca-marche" className="text-white/70 hover:text-[#2ECC71] transition-colors duration-200">
                   Comment ça marche
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#faq" className="text-white/70 hover:text-[#2ECC71] transition-colors duration-200">
+                <Link to="/#faq" className="text-white/70 hover:text-[#2ECC71] transition-colors duration-200">
                   FAQ
-                </a>
+                </Link>
               </li>
             </ul>
           </div>

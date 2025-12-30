@@ -36,27 +36,27 @@ export const Navbar = () => {
             >
               Accueil
             </Link>
-            <a 
-              href="#specialites" 
+            <Link
+              to="/#specialites"
               className="text-sm font-medium text-[#0A2540] hover:text-[#2ECC71] transition-colors duration-200"
               data-testid="nav-specialites"
             >
               Spécialités
-            </a>
-            <a 
-              href="#comment-ca-marche" 
+            </Link>
+            <Link
+              to="/#comment-ca-marche"
               className="text-sm font-medium text-[#0A2540] hover:text-[#2ECC71] transition-colors duration-200"
               data-testid="nav-how-it-works"
             >
               Comment ça marche
-            </a>
-            <a 
-              href="#faq" 
+            </Link>
+            <Link
+              to="/#faq"
               className="text-sm font-medium text-[#0A2540] hover:text-[#2ECC71] transition-colors duration-200"
               data-testid="nav-faq"
             >
               FAQ
-            </a>
+            </Link>
             {isAuthed && (
               <Link
                 to="/dossier"
@@ -134,27 +134,27 @@ export const Navbar = () => {
             >
               Accueil
             </Link>
-            <a 
-              href="#specialites" 
+            <Link
+              to="/#specialites"
               className="block py-3 text-lg font-medium text-[#0A2540]"
               onClick={() => setIsOpen(false)}
             >
               Spécialités
-            </a>
-            <a 
-              href="#comment-ca-marche" 
+            </Link>
+            <Link
+              to="/#comment-ca-marche"
               className="block py-3 text-lg font-medium text-[#0A2540]"
               onClick={() => setIsOpen(false)}
             >
               Comment ça marche
-            </a>
-            <a 
-              href="#faq" 
+            </Link>
+            <Link
+              to="/#faq"
               className="block py-3 text-lg font-medium text-[#0A2540]"
               onClick={() => setIsOpen(false)}
             >
               FAQ
-            </a>
+            </Link>
             {isAuthed ? (
               <Link
                 to="/dossier"
