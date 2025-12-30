@@ -2,6 +2,9 @@
 
 Patient intake UI + API with OpenEMR integration.
 
+## Documentation
+- User guide: `docs/USER_GUIDE.md`
+
 ## Local setup
 
 ### 1) OpenEMR (optional but recommended)
