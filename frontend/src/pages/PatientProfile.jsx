@@ -4,7 +4,6 @@ import axios from 'axios';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { Button } from '../components/ui/button';
-import { Textarea } from '../components/ui/textarea';
 import { authHeaders, getToken } from '../lib/auth';
 import {
   Calendar,
@@ -15,9 +14,7 @@ import {
   MapPin,
   AlertTriangle,
   Loader2,
-  FileText,
-  MessageCircle,
-  X
+  FileText
 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -65,15 +62,6 @@ export const PatientProfile = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
-  const [assistantOpen, setAssistantOpen] = useState(false);
-  const [chatInput, setChatInput] = useState('');
-  const [chatMessages, setChatMessages] = useState(() => ([
-    {
-      id: 'welcome',
-      role: 'assistant',
-      content: 'Bonjour, je suis l assistant Santia. Decrivez votre besoin et vos disponibilites.'
-    }
-  ]));
 
   useEffect(() => {
     const fetchIntake = async () => {
@@ -115,17 +103,6 @@ export const PatientProfile = () => {
     }
   };
 
-  const handleSendMessage = () => {
-    const trimmed = chatInput.trim();
-    if (!trimmed) return;
-    const message = {
-      id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-      role: 'patient',
-      content: trimmed
-    };
-    setChatMessages((prev) => [...prev, message]);
-    setChatInput('');
-  };
 
   const statusInfo = intake?.status ? (statusMeta[intake.status] || statusMeta.pending) : statusMeta.pending;
   const meetingReady = intake?.status === 'scheduled' && intake?.meeting_url;
@@ -388,74 +365,6 @@ export const PatientProfile = () => {
 
       <Footer />
 
-      {intake && (
-        <div className="fixed bottom-6 right-6 z-50">
-          {!assistantOpen && (
-            <button
-              className="flex items-center gap-2 bg-[#2ECC71] text-white px-4 py-3 rounded-full shadow-lg hover:shadow-xl transition-shadow"
-              onClick={() => setAssistantOpen(true)}
-            >
-              <MessageCircle className="w-4 h-4" />
-              Assistant IA
-            </button>
-          )}
-
-          {assistantOpen && (
-            <div className="w-[320px] sm:w-[360px] bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 bg-[#0A2540] text-white">
-                <div>
-                  <p className="text-sm font-semibold">Assistant Santia</p>
-                  <p className="text-xs text-white/70">Bientot connecte a n8n</p>
-                </div>
-                <button
-                  className="p-1 rounded-full hover:bg-white/10 transition-colors"
-                  onClick={() => setAssistantOpen(false)}
-                  aria-label="Fermer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="p-4">
-                <div className="max-h-56 overflow-y-auto space-y-3">
-                  {chatMessages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={`flex ${message.role === 'patient' ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div
-                        className={`max-w-[80%] rounded-2xl px-3 py-2 text-xs ${
-                          message.role === 'patient'
-                            ? 'bg-[#0A2540] text-white'
-                            : 'bg-slate-50 text-[#0A2540] border border-slate-200'
-                        }`}
-                      >
-                        {message.content}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-3 flex flex-col gap-2">
-                  <Textarea
-                    value={chatInput}
-                    onChange={(event) => setChatInput(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' && !event.shiftKey) {
-                        event.preventDefault();
-                        handleSendMessage();
-                      }
-                    }}
-                    placeholder="Ecrivez votre message..."
-                    className="input-santia min-h-[80px]"
-                  />
-                  <Button className="btn-green" onClick={handleSendMessage}>
-                    Envoyer
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 };

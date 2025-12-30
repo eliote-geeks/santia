@@ -8,6 +8,7 @@ import { Admin } from "./pages/Admin";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { Messagerie } from "./pages/Messagerie";
+import { AssistantWidget } from "./components/AssistantWidget";
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
           <Route path="/messagerie" element={<Messagerie />} />
           <Route path="/admin" element={<Admin />} />
         </Routes>
+        <AssistantWidget />
       </BrowserRouter>
     </div>
   );
