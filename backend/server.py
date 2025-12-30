@@ -350,18 +350,24 @@ class OpenIMClient:
     def __init__(self) -> None:
         self.chat_base_url = os.environ.get("OPENIM_CHAT_BASE_URL", "").rstrip("/")
         self.admin_base_url = os.environ.get("OPENIM_ADMIN_BASE_URL", "").rstrip("/")
+        self.api_base_url = os.environ.get("OPENIM_API_BASE_URL", "").rstrip("/")
         self.admin_account = os.environ.get("OPENIM_ADMIN_ACCOUNT", "chatAdmin")
         self.admin_password = os.environ.get("OPENIM_ADMIN_PASSWORD", "")
         self.admin_version = os.environ.get("OPENIM_ADMIN_VERSION", "1.0")
         self.platform_id = int(os.environ.get("OPENIM_PLATFORM_ID", "5"))
         self._admin_token = None
         self._admin_token_expires_at = 0.0
+        self._admin_im_token = None
+        self._admin_im_expires_at = 0.0
 
     def can_login(self) -> bool:
         return bool(self.chat_base_url)
 
     def can_register(self) -> bool:
         return bool(self.chat_base_url and self.admin_base_url)
+
+    def can_send_message(self) -> bool:
+        return bool(self.api_base_url and self.admin_base_url)
 
     def _admin_password(self) -> str:
         if self.admin_password:
@@ -410,7 +416,50 @@ class OpenIMClient:
             raise OpenIMError("Admin token missing from response")
         self._admin_token = token
         self._admin_token_expires_at = now + 3600
+        im_token = data.get("imToken")
+        if im_token:
+            self._admin_im_token = im_token
+            self._admin_im_expires_at = now + 3600
         return token
+
+    def _ensure_admin_im_token(self) -> str:
+        now = time.time()
+        if self._admin_im_token and now < self._admin_im_expires_at - 60:
+            return self._admin_im_token
+        self._ensure_admin_token()
+        if not self._admin_im_token:
+            raise OpenIMError("Admin IM token missing from response")
+        return self._admin_im_token
+
+    def _api_post(self, path: str, payload: dict, token: str) -> dict:
+        if not self.api_base_url:
+            raise OpenIMError("OpenIM API base URL is not configured")
+        response = requests.post(
+            f"{self.api_base_url}{path}",
+            json=payload,
+            headers=self._headers(token),
+            timeout=15,
+        )
+        if response.status_code != 200:
+            raise OpenIMError(f"HTTP {response.status_code}: {response.text}")
+        data = response.json()
+        err_code = data.get("errCode", 0)
+        if err_code:
+            raise OpenIMError(f"OpenIM error {err_code}: {data.get('errMsg')}")
+        return data.get("data") or {}
+
+    def send_text_message(self, send_id: str, recv_id: str, text: str) -> dict:
+        if not self.can_send_message():
+            raise OpenIMError("OpenIM message sending is not configured")
+        token = self._ensure_admin_im_token()
+        payload = {
+            "sendID": send_id,
+            "recvID": recv_id,
+            "sessionType": 1,
+            "contentType": 101,
+            "content": {"content": text},
+        }
+        return self._api_post("/msg/send_msg", payload, token)
 
     def register_user(self, name: str, email: str, password: str) -> dict:
         if not self.can_register():
@@ -565,6 +614,9 @@ class IntakeResponse(BaseModel):
     user_id: Optional[str] = None
     assigned_doctor_id: Optional[str] = None
     assigned_doctor: Optional[DoctorSummary] = None
+    openim_patient_id: Optional[str] = None
+    openim_doctor_id: Optional[str] = None
+    openim_intro_sent: Optional[bool] = None
     openemr_patient_id: Optional[str] = None
     openemr_appointment_id: Optional[str] = None
 
@@ -797,6 +849,9 @@ async def create_intake(input: IntakeCreate, current_user: dict = Depends(get_cu
         "user_id": current_user.get("id"),
         "assigned_doctor_id": None,
         "assigned_doctor": None,
+        "openim_patient_id": None,
+        "openim_doctor_id": None,
+        "openim_intro_sent": False,
         "openemr_patient_id": openemr_patient_id,
         "openemr_appointment_id": None,
     }
@@ -902,6 +957,48 @@ async def assign_doctor(intake_id: str, input: IntakeAssignDoctor, _: dict = Dep
         "assigned_doctor_id": doctor["id"],
         "assigned_doctor": doctor_summary,
     }
+
+    patient_openim_id = None
+    doctor_openim_id = doctor.get("openim_user_id")
+    patient_user = None
+    if intake.get("user_id"):
+        patient_user = await db.users.find_one({"id": intake["user_id"]}, {"_id": 0})
+        if patient_user:
+            patient_openim_id = patient_user.get("openim_user_id")
+
+    if patient_openim_id:
+        update_fields["openim_patient_id"] = patient_openim_id
+    if doctor_openim_id:
+        update_fields["openim_doctor_id"] = doctor_openim_id
+
+    should_send_intro = (
+        openim_client.can_send_message()
+        and patient_openim_id
+        and doctor_openim_id
+        and (
+            not intake.get("openim_intro_sent")
+            or intake.get("openim_doctor_id") != doctor_openim_id
+        )
+    )
+
+    if should_send_intro:
+        patient_name = intake.get("name", "Patient")
+        doctor_name = doctor.get("name", "Votre medecin")
+        intro = (
+            f"Bonjour {patient_name}, je suis Dr {doctor_name}. "
+            "Je vais assurer votre teleconsultation. "
+            "Vous pouvez m ecrire ici pour preparer le rendez-vous."
+        )
+        try:
+            await asyncio.to_thread(
+                openim_client.send_text_message,
+                doctor_openim_id,
+                patient_openim_id,
+                intro,
+            )
+            update_fields["openim_intro_sent"] = True
+        except OpenIMError as exc:
+            logger.warning("OpenIM intro message failed: %s", exc)
 
     await db.intakes.update_one({"id": intake_id}, {"$set": update_fields})
     updated = {**intake, **update_fields}
