@@ -57,14 +57,16 @@ export const Navbar = () => {
             >
               FAQ
             </a>
-            <Link
-              to={isAuthed ? "/dossier" : "/login"}
-              className={`text-sm font-medium transition-colors duration-200 ${
-                isActive('/login') || isActive('/dossier') ? 'text-[#2ECC71]' : 'text-[#0A2540] hover:text-[#2ECC71]'
-              }`}
-            >
-              Espace patient
-            </Link>
+            {isAuthed && (
+              <Link
+                to="/dossier"
+                className={`text-sm font-medium transition-colors duration-200 ${
+                  isActive('/dossier') ? 'text-[#2ECC71]' : 'text-[#0A2540] hover:text-[#2ECC71]'
+                }`}
+              >
+                Mon dossier
+              </Link>
+            )}
             {isAuthed && (
               <Link
                 to="/messagerie"
@@ -83,13 +85,30 @@ export const Navbar = () => {
               <Phone className="w-4 h-4" />
               <span>+237 6 00 00 00 00</span>
             </a>
-            <Link 
-              to="/consultation" 
-              className="btn-primary text-sm py-3 px-6"
-              data-testid="nav-cta-consultation"
-            >
-              Commencer
-            </Link>
+            {isAuthed ? (
+              <Link
+                to="/consultation"
+                className="btn-primary text-sm py-3 px-6"
+                data-testid="nav-cta-consultation"
+              >
+                Commencer
+              </Link>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  className="text-sm font-medium text-[#0A2540] hover:text-[#2ECC71] transition-colors duration-200"
+                >
+                  Se connecter
+                </Link>
+                <Link
+                  to="/register"
+                  className="btn-green text-sm py-3 px-6"
+                >
+                  Creer un compte
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -136,13 +155,32 @@ export const Navbar = () => {
             >
               FAQ
             </a>
-            <Link
-              to={isAuthed ? "/dossier" : "/login"}
-              className="block py-3 text-lg font-medium text-[#0A2540]"
-              onClick={() => setIsOpen(false)}
-            >
-              Espace patient
-            </Link>
+            {isAuthed ? (
+              <Link
+                to="/dossier"
+                className="block py-3 text-lg font-medium text-[#0A2540]"
+                onClick={() => setIsOpen(false)}
+              >
+                Mon dossier
+              </Link>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  className="block py-3 text-lg font-medium text-[#0A2540]"
+                  onClick={() => setIsOpen(false)}
+                >
+                  Se connecter
+                </Link>
+                <Link
+                  to="/register"
+                  className="block py-3 text-lg font-medium text-[#0A2540]"
+                  onClick={() => setIsOpen(false)}
+                >
+                  Creer un compte
+                </Link>
+              </>
+            )}
             {isAuthed && (
               <Link
                 to="/messagerie"
@@ -153,13 +191,23 @@ export const Navbar = () => {
               </Link>
             )}
             <div className="pt-4 border-t border-slate-100">
-              <Link 
-                to="/consultation" 
-                className="block w-full text-center btn-primary py-4"
-                onClick={() => setIsOpen(false)}
-              >
-                Commencer une consultation
-              </Link>
+              {isAuthed ? (
+                <Link
+                  to="/consultation"
+                  className="block w-full text-center btn-primary py-4"
+                  onClick={() => setIsOpen(false)}
+                >
+                  Commencer une consultation
+                </Link>
+              ) : (
+                <Link
+                  to="/register"
+                  className="block w-full text-center btn-primary py-4"
+                  onClick={() => setIsOpen(false)}
+                >
+                  Creer un compte
+                </Link>
+              )}
             </div>
           </div>
         </div>

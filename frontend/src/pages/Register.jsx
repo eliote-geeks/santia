@@ -49,7 +49,7 @@ export const Register = () => {
         <div className="max-w-xl mx-auto px-4 sm:px-6">
           <div className="bg-white rounded-3xl shadow-xl p-8 md:p-10">
             <h1 className="text-3xl font-bold text-[#0A2540] mb-2">Creer un compte</h1>
-            <p className="text-sm text-[#64748B] mb-8">Accedez a votre espace patient et suivez vos consultations.</p>
+            <p className="text-sm text-[#64748B] mb-8">Accedez a votre dossier et suivez vos consultations.</p>
 
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700 mb-6">
