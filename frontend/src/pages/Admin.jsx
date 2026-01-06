@@ -52,6 +52,9 @@ export const Admin = () => {
   const [doctorLoading, setDoctorLoading] = useState(true);
   const [doctorError, setDoctorError] = useState('');
   const [doctorSuccess, setDoctorSuccess] = useState('');
+  const [patients, setPatients] = useState([]);
+  const [patientLoading, setPatientLoading] = useState(true);
+  const [patientError, setPatientError] = useState('');
   const [doctorForm, setDoctorForm] = useState({
     name: '',
     email: '',
@@ -104,6 +107,25 @@ export const Admin = () => {
     }
   };
 
+  const loadPatients = async () => {
+    setPatientLoading(true);
+    setPatientError('');
+    try {
+      const response = await axios.get(`${API_URL}/api/patients`, { headers: authHeaders() });
+      setPatients(response.data || []);
+    } catch (err) {
+      if (err.response?.status === 401) {
+        setPatientError('Veuillez vous connecter pour acceder a l administration.');
+      } else if (err.response?.status === 403) {
+        setPatientError('Acces reserve a l administration.');
+      } else {
+        setPatientError('Impossible de charger les patients.');
+      }
+    } finally {
+      setPatientLoading(false);
+    }
+  };
+
   useEffect(() => {
     const token = getToken();
     const user = getUser();
@@ -117,6 +139,7 @@ export const Admin = () => {
     }
     loadIntakes();
     loadDoctors();
+    loadPatients();
   }, [navigate]);
 
   const handleScheduleChange = (id, value) => {
@@ -231,7 +254,15 @@ export const Admin = () => {
               <h1 className="text-3xl md:text-4xl font-bold text-[#0A2540]">Planification manuelle</h1>
               <p className="text-sm text-[#64748B]">Planifiez les consultations et envoyez les liens WhatsApp.</p>
             </div>
-            <Button onClick={loadIntakes} variant="outline" className="flex items-center gap-2">
+            <Button
+              onClick={() => {
+                loadIntakes();
+                loadDoctors();
+                loadPatients();
+              }}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
               <RefreshCw className="w-4 h-4" />
               Rafraichir
             </Button>
@@ -351,6 +382,36 @@ export const Admin = () => {
                 </div>
               )}
             </div>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 mb-8">
+            <h2 className="text-xl font-bold text-[#0A2540] mb-4">Patients inscrits</h2>
+            {patientLoading ? (
+              <div className="flex items-center gap-2 text-sm text-[#64748B]">
+                <Loader2 className="w-4 h-4 animate-spin text-[#2ECC71]" />
+                Chargement des patients...
+              </div>
+            ) : patientError ? (
+              <div className="text-sm text-red-700">{patientError}</div>
+            ) : (
+              <div className="space-y-3">
+                {patients.length === 0 && (
+                  <div className="text-sm text-[#64748B]">Aucun patient inscrit pour le moment.</div>
+                )}
+                {patients.map((patient) => (
+                  <div key={patient.id} className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border border-slate-200 rounded-xl px-4 py-3">
+                    <div>
+                      <p className="font-semibold text-[#0A2540]">{patient.name}</p>
+                      <p className="text-sm text-[#64748B]">{patient.email} · {patient.phone}</p>
+                      <p className="text-xs text-[#94A3B8]">Inscrit le {formatDateTime(patient.created_at)}</p>
+                    </div>
+                    <div className="text-xs text-[#64748B]">
+                      {patient.openim_user_id ? 'OpenIM actif' : 'OpenIM non lie'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {error && (

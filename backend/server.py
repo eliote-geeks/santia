@@ -766,6 +766,17 @@ async def get_doctors(_: dict = Depends(require_admin)):
     )
     return doctors
 
+@api_router.get("/patients", response_model=List[UserResponse])
+async def get_patients(_: dict = Depends(require_admin)):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Base de donnees indisponible")
+    patients = (
+        await db.users.find({"role": "patient"}, {"_id": 0})
+        .sort("created_at", -1)
+        .to_list(1000)
+    )
+    return [UserResponse(**sanitize_user(user)) for user in patients]
+
 @api_router.post("/doctors", response_model=DoctorCreateResponse)
 async def create_doctor(input: DoctorCreate, _: dict = Depends(require_admin)):
     if db is None:
