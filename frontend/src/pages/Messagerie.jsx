@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { Button } from '../components/ui/button';
-import { getOpenIM, getToken } from '../lib/auth';
+import { clearAuth, getOpenIM, getToken } from '../lib/auth';
 
 const OPENIM_WEB_URL = (process.env.REACT_APP_OPENIM_WEB_URL || 'http://localhost:11001').replace(/\/$/, '');
 const OPENIM_API_URL = process.env.REACT_APP_OPENIM_API_URL || '';
@@ -49,6 +49,11 @@ export const Messagerie = () => {
     window.open(url, '_blank', 'noopener');
   };
 
+  const handleReauth = () => {
+    clearAuth();
+    navigate('/login?next=/messagerie');
+  };
+
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
       <Navbar />
@@ -63,7 +68,10 @@ export const Messagerie = () => {
 
             {error && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-700 mb-6">
-                {error}
+                <p className="mb-3">{error}</p>
+                <Button variant="outline" onClick={handleReauth}>
+                  Se reconnecter
+                </Button>
               </div>
             )}
 

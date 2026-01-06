@@ -1,16 +1,22 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, Phone } from 'lucide-react';
-import { getToken, getUser } from '../lib/auth';
+import { clearAuth, getToken, getUser } from '../lib/auth';
 
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const isAuthed = !!getToken();
   const user = getUser();
   const isAdmin = user?.role === 'admin';
 
   const isActive = (path) => location.pathname === path;
+  const handleLogout = () => {
+    clearAuth();
+    setIsOpen(false);
+    navigate('/');
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 glass-header border-b border-slate-100" data-testid="navbar">
@@ -98,13 +104,22 @@ export const Navbar = () => {
               <span>+237 6 00 00 00 00</span>
             </a>
             {isAuthed ? (
-              <Link
-                to="/consultation"
-                className="btn-primary text-sm py-3 px-6"
-                data-testid="nav-cta-consultation"
-              >
-                Commencer
-              </Link>
+              <>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="text-sm font-medium text-[#0A2540] hover:text-[#2ECC71] transition-colors duration-200"
+                >
+                  Se deconnecter
+                </button>
+                <Link
+                  to="/consultation"
+                  className="btn-primary text-sm py-3 px-6"
+                  data-testid="nav-cta-consultation"
+                >
+                  Commencer
+                </Link>
+              </>
             ) : (
               <>
                 <Link
@@ -196,6 +211,13 @@ export const Navbar = () => {
                     Messagerie
                   </Link>
                 )}
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="block w-full text-left py-3 text-lg font-medium text-[#0A2540]"
+                >
+                  Se deconnecter
+                </button>
               </>
             ) : (
               <>
