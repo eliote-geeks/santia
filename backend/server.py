@@ -371,9 +371,14 @@ class OpenIMClient:
 
     def _admin_password(self) -> str:
         if self.admin_password:
-            return self.admin_password
-        digest = hashlib.md5(self.admin_account.encode("utf-8")).hexdigest()
-        return digest
+            normalized = self.admin_password.strip()
+            if re.fullmatch(r"[a-f0-9]{32}", normalized):
+                return normalized
+            return self._hash_password(normalized)
+        return self._hash_password(self.admin_account)
+
+    def _hash_password(self, password: str) -> str:
+        return hashlib.md5(password.encode("utf-8")).hexdigest()
 
     def _headers(self, token: Optional[str] = None) -> dict:
         headers = {
@@ -472,7 +477,7 @@ class OpenIMClient:
             "user": {
                 "nickname": name,
                 "email": email,
-                "password": password,
+                "password": self._hash_password(password),
             },
         }
         return self._post(f"{self.chat_base_url}/account/register", payload, token=token)
@@ -484,7 +489,7 @@ class OpenIMClient:
             "deviceID": "santia-web",
             "platform": self.platform_id,
             "email": email,
-            "password": password,
+            "password": self._hash_password(password),
         }
         return self._post(f"{self.chat_base_url}/account/login", payload)
 
