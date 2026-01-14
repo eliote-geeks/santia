@@ -13,7 +13,26 @@ If you run OpenEMR with docker compose, set `OPENEMR_BASE_URL=http://openemr` so
 Use `OPENEMR_SITE_ADDR` and `OPENEMR_REDIRECT_URI` for your public OpenEMR URL.
 Set `PUBLIC_OPENIM_WEB_URL` (and optional API/chat/ws URLs) if you want the patient "Messagerie" button to open a specific domain.
 
-## 2) Start the app (frontend + backend + mongo)
+## 2) Build the frontend (required)
+
+The frontend container serves static files from `frontend/build`.
+If your server cannot build Node assets, build locally and copy the folder to the server.
+
+```bash
+cd frontend
+yarn install
+REACT_APP_BACKEND_URL=http://YOUR_HOST:8001 \
+REACT_APP_OPENIM_WEB_URL=http://YOUR_HOST:11001 \
+REACT_APP_OPENIM_API_URL=http://YOUR_HOST:10002 \
+REACT_APP_OPENIM_CHAT_URL=http://YOUR_HOST:10008 \
+REACT_APP_OPENIM_WS_URL=ws://YOUR_HOST:10001 \
+yarn build
+
+# Copy build to the server (example)
+scp -r build root@YOUR_HOST:/opt/santia/frontend/
+```
+
+## 3) Start the app (frontend + backend + mongo)
 
 ```bash
 docker compose --env-file deploy/env -f deploy/docker-compose.app.yml up -d
@@ -22,7 +41,7 @@ docker compose --env-file deploy/env -f deploy/docker-compose.app.yml up -d
 - Frontend: `http://YOUR_HOST:3000`
 - Backend: `http://YOUR_HOST:8001`
 
-## 3) Start OpenEMR (optional)
+## 4) Start OpenEMR (optional)
 
 ```bash
 docker compose --env-file deploy/env -f deploy/docker-compose.openemr.yml up -d
@@ -49,7 +68,7 @@ sudo docker exec santia-openemr-mysql mysql -uroot -p${OPENEMR_MYSQL_ROOT_PASSWO
 
 Make sure the backend env uses the same `OPENEMR_*` values.
 
-## 4) Start Jitsi (optional)
+## 5) Start Jitsi (optional)
 
 ```bash
 docker compose --env-file deploy/env -f deploy/docker-compose.jitsi.yml up -d
@@ -62,7 +81,7 @@ For production, set:
 - `JITSI_ADVERTISE_IP` to your public IP
 - open UDP port `JITSI_JVB_PORT` (default 10000)
 
-## 5) Start OpenIM (optional)
+## 6) Start OpenIM (optional)
 
 ```bash
 docker compose --env-file deploy/env -f deploy/docker-compose.openim.yml up -d
@@ -75,7 +94,7 @@ OpenIM will be available on:
 
 SSO bridge page: `http://YOUR_HOST:${OPENIM_WEB_PORT}/sso.html`
 
-## 6) Run all services together
+## 7) Run all services together
 
 ```bash
 docker compose --env-file deploy/env \

@@ -7,7 +7,7 @@ const starterMessages = [
   {
     id: 'intro',
     role: 'assistant',
-    content: 'Bonjour, je suis Sanity, votre assistante IA. Je suis ravie de vous aider.'
+    content: 'Bonjour, je suis Santy, votre assistante IA. Je suis ravie de vous aider.'
   },
   {
     id: 'prompt',
@@ -61,12 +61,12 @@ export const AssistantWidget = () => {
         <button
           className="flex items-center gap-3 bg-[#0A2540] text-white px-4 py-3 rounded-full shadow-lg hover:shadow-xl border border-white/10 transition"
           onClick={() => setIsOpen(true)}
-          aria-label="Ouvrir Sanity"
+          aria-label="Ouvrir Santy"
         >
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#2ECC71] text-[#0A2540] font-semibold">
             S
           </span>
-          <span className="text-sm font-semibold">Sanity</span>
+          <span className="text-sm font-semibold">Santy</span>
           <span className="text-xs text-white/70">Assistante IA</span>
         </button>
       )}
@@ -76,13 +76,13 @@ export const AssistantWidget = () => {
           <div className="px-4 py-3 bg-gradient-to-r from-[#0A2540] via-[#0A2540] to-[#1B6B52] text-white">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-semibold">Sanity</p>
+                <p className="text-sm font-semibold">Santy</p>
                 <p className="text-xs text-white/70">Assistante IA - disponible 7j/7</p>
               </div>
               <button
                 className="p-1 rounded-full hover:bg-white/10 transition-colors"
                 onClick={() => setIsOpen(false)}
-                aria-label="Fermer Sanity"
+                aria-label="Fermer Santy"
               >
                 <X className="w-4 h-4" />
               </button>

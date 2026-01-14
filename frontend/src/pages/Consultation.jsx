@@ -12,6 +12,7 @@ import {
   Moon,
   Sparkles,
   Baby,
+  Stethoscope,
   Check,
   AlertTriangle,
   Loader2
@@ -38,6 +39,7 @@ const BOOKING_STORAGE_KEY = 'santia_booking';
 
 const categories = [
   { id: 'sante-sexuelle', title: 'Santé sexuelle', icon: Heart, color: 'bg-rose-50', iconColor: 'text-rose-500' },
+  { id: 'generale', title: 'Générale', icon: Stethoscope, color: 'bg-blue-50', iconColor: 'text-blue-600' },
   { id: 'addictions', title: 'Addictions', icon: ShieldAlert, color: 'bg-amber-50', iconColor: 'text-amber-600' },
   { id: 'perte-de-poids', title: 'Perte de poids', icon: Scale, color: 'bg-emerald-50', iconColor: 'text-emerald-600' },
   { id: 'sommeil', title: 'Sommeil', icon: Moon, color: 'bg-indigo-50', iconColor: 'text-indigo-600' },

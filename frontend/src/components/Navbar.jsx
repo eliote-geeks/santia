@@ -23,13 +23,13 @@ export const Navbar = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-3" data-testid="navbar-logo">
-            <div className="w-10 h-10 bg-[#2ECC71] rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold text-xl font-['Poppins']">S</span>
-            </div>
-            <div>
-              <span className="text-xl font-bold text-[#0A2540] font-['Poppins']">Santia</span>
-              <p className="text-xs text-[#64748B] hidden sm:block">Consultation médicale en ligne</p>
+          <Link to="/" className="flex items-center" data-testid="navbar-logo">
+            <div className="bg-[#0A2540] rounded-xl px-4 py-2">
+              <img
+                src="/images/logo_rm_transparent.png"
+                alt="Santia Logo"
+                className="h-12 w-auto"
+              />
             </div>
           </Link>
 
@@ -99,9 +99,9 @@ export const Navbar = () => {
 
           {/* CTA Button */}
           <div className="hidden md:flex items-center gap-4">
-            <a href="tel:+237600000000" className="flex items-center gap-2 text-sm text-[#64748B] hover:text-[#0A2540] transition-colors duration-200">
+            <a href="tel:+237657817198" className="flex items-center gap-2 text-sm text-[#64748B] hover:text-[#0A2540] transition-colors duration-200">
               <Phone className="w-4 h-4" />
-              <span>+237 6 00 00 00 00</span>
+              <span>+237 6 57 81 71 98</span>
             </a>
             {isAuthed ? (
               <>

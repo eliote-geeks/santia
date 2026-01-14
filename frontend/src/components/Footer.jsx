@@ -8,11 +8,12 @@ export const Footer = () => {
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
           {/* Brand */}
           <div className="lg:col-span-1">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-[#2ECC71] rounded-xl flex items-center justify-center">
-                <span className="text-white font-bold text-xl font-['Poppins']">S</span>
-              </div>
-              <span className="text-xl font-bold font-['Poppins']">Santia</span>
+            <div className="mb-4">
+              <img
+                src="/images/logo_rm_transparent.png"
+                alt="Santia Logo"
+                className="h-16 w-auto"
+              />
             </div>
             <p className="text-white/70 mb-4">
               Consultation médicale en ligne au Cameroun. La santé en confiance.
@@ -82,9 +83,9 @@ export const Footer = () => {
             <h4 className="font-bold text-lg mb-4">Contact</h4>
             <ul className="space-y-3">
               <li>
-                <a href="tel:+237600000000" className="flex items-center gap-2 text-white/70 hover:text-[#2ECC71] transition-colors duration-200">
+                <a href="tel:+237657817198" className="flex items-center gap-2 text-white/70 hover:text-[#2ECC71] transition-colors duration-200">
                   <Phone className="w-4 h-4" />
-                  <span>+237 6 00 00 00 00</span>
+                  <span>+237 6 57 81 71 98</span>
                 </a>
               </li>
               <li>

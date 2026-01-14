@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Heart, ShieldAlert, Scale, Moon, Sparkles, Baby, ArrowRight } from 'lucide-react';
+import { Heart, ShieldAlert, Scale, Moon, Sparkles, Baby, Stethoscope, ArrowRight } from 'lucide-react';
 
 const specialties = [
   {
@@ -9,6 +9,14 @@ const specialties = [
     icon: Heart,
     color: 'bg-rose-50',
     iconColor: 'text-rose-500'
+  },
+  {
+    id: 'generale',
+    title: 'Générale',
+    description: 'Consultation générale, bilan de santé...',
+    icon: Stethoscope,
+    color: 'bg-blue-50',
+    iconColor: 'text-blue-600'
   },
   {
     id: 'addictions',
