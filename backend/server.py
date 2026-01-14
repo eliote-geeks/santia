@@ -146,6 +146,9 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, password_hash: str) -> bool:
     return pwd_context.verify(password, password_hash)
 
+def hash_openim_password(password: str) -> str:
+    return hashlib.md5(password.encode("utf-8")).hexdigest()
+
 def create_access_token(subject: str, email: str, role: str) -> str:
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=AUTH_TOKEN_EXPIRE_MINUTES)
     payload = {
@@ -160,6 +163,7 @@ def sanitize_user(user: dict) -> dict:
     clean = dict(user)
     clean.pop("password_hash", None)
     clean.pop("password", None)
+    clean.pop("openim_password_hash", None)
     return clean
 
 async def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
@@ -494,6 +498,17 @@ class OpenIMClient:
         }
         return self._post(f"{self.chat_base_url}/account/login", payload)
 
+    def login_user_hashed(self, email: str, password_hash: str) -> dict:
+        if not self.can_login():
+            raise OpenIMError("OpenIM login is not configured")
+        payload = {
+            "deviceID": "santia-web",
+            "platform": self.platform_id,
+            "email": email,
+            "password": password_hash,
+        }
+        return self._post(f"{self.chat_base_url}/account/login", payload)
+
 openim_client = OpenIMClient()
 
 # Define Models
@@ -698,6 +713,7 @@ async def register_user(input: UserCreate):
         "email": email,
         "phone": input.phone.strip(),
         "password_hash": hash_password(input.password),
+        "openim_password_hash": hash_openim_password(input.password),
         "role": "patient",
         "created_at": created_at,
         "openim_user_id": openim_user_id,
@@ -718,6 +734,13 @@ async def login_user(input: UserLogin):
     user = await db.users.find_one({"email": email}, {"_id": 0})
     if not user or not verify_password(input.password, user.get("password_hash", "")):
         raise HTTPException(status_code=401, detail="Identifiants invalides")
+    openim_password_hash = hash_openim_password(input.password)
+    if user.get("openim_password_hash") != openim_password_hash:
+        await db.users.update_one(
+            {"id": user["id"]},
+            {"$set": {"openim_password_hash": openim_password_hash}},
+        )
+        user["openim_password_hash"] = openim_password_hash
     openim_tokens = None
     if openim_client.can_login():
         try:
@@ -759,6 +782,40 @@ async def login_user(input: UserLogin):
 @api_router.get("/auth/me", response_model=UserResponse)
 async def get_me(current_user: dict = Depends(get_current_user)):
     return UserResponse(**sanitize_user(current_user))
+
+@api_router.post("/auth/openim/refresh", response_model=OpenIMTokens)
+async def refresh_openim_tokens(current_user: dict = Depends(get_current_user)):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Base de donnees indisponible")
+    if not openim_client.can_login():
+        raise HTTPException(status_code=503, detail="Messagerie indisponible")
+
+    user = await db.users.find_one({"id": current_user.get("id")}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+
+    password_hash = user.get("openim_password_hash")
+    if not password_hash:
+        raise HTTPException(status_code=409, detail="Mot de passe requis pour reconnecter la messagerie")
+
+    try:
+        openim_payload = await asyncio.to_thread(
+            openim_client.login_user_hashed,
+            user.get("email", ""),
+            password_hash,
+        )
+        openim_tokens = build_openim_tokens(openim_payload)
+        if not openim_tokens:
+            raise OpenIMError("OpenIM tokens missing")
+        if user.get("openim_user_id") != openim_tokens.user_id:
+            await db.users.update_one(
+                {"id": user["id"]},
+                {"$set": {"openim_user_id": openim_tokens.user_id}},
+            )
+        return openim_tokens
+    except OpenIMError as exc:
+        logger.warning("OpenIM refresh failed: %s", exc)
+        raise HTTPException(status_code=502, detail="Impossible de rafraichir la messagerie")
 
 @api_router.get("/doctors", response_model=List[DoctorResponse])
 async def get_doctors(_: dict = Depends(require_admin)):

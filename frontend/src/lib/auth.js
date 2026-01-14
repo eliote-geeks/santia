@@ -13,7 +13,10 @@ export const setAuth = (token, user) => {
 
 export const setOpenIM = (payload) => {
   if (!payload) return;
-  localStorage.setItem(OPENIM_KEY, JSON.stringify(payload));
+  const enriched = payload.issued_at
+    ? payload
+    : { ...payload, issued_at: new Date().toISOString() };
+  localStorage.setItem(OPENIM_KEY, JSON.stringify(enriched));
 };
 
 export const getToken = () => localStorage.getItem(TOKEN_KEY);

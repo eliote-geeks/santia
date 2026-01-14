@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { Button } from '../components/ui/button';
-import { clearAuth, getOpenIM, getToken } from '../lib/auth';
+import { authHeaders, clearAuth, getOpenIM, getToken, setOpenIM } from '../lib/auth';
 
+const API_URL = process.env.REACT_APP_BACKEND_URL;
 const OPENIM_WEB_URL = (process.env.REACT_APP_OPENIM_WEB_URL || 'http://localhost:11001').replace(/\/$/, '');
 const OPENIM_API_URL = process.env.REACT_APP_OPENIM_API_URL || '';
 const OPENIM_CHAT_URL = process.env.REACT_APP_OPENIM_CHAT_URL || '';
@@ -26,7 +28,7 @@ export const Messagerie = () => {
       ? 'Bienvenue. Votre messagerie est prete.'
       : '';
   const [error, setError] = useState('');
-  const openim = getOpenIM();
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (!getToken()) {
@@ -34,11 +36,43 @@ export const Messagerie = () => {
     }
   }, [navigate]);
 
-  const handleOpenChat = () => {
+  const isOpenIMStale = (payload) => {
+    if (!payload?.issued_at) return true;
+    const issuedAt = new Date(payload.issued_at).getTime();
+    if (Number.isNaN(issuedAt)) return true;
+    const ageMs = Date.now() - issuedAt;
+    return ageMs > 12 * 60 * 60 * 1000;
+  };
+
+  const refreshOpenIM = async () => {
+    setRefreshing(true);
+    try {
+      const response = await axios.post(`${API_URL}/api/auth/openim/refresh`, {}, { headers: authHeaders() });
+      setOpenIM(response.data);
+      return response.data;
+    } catch (err) {
+      if (err.response?.status === 401) {
+        setError('Votre session a expire. Merci de vous reconnecter.');
+      } else if (err.response?.status === 409) {
+        setError("Reconnectez-vous pour reinitialiser la messagerie.");
+      } else {
+        setError("Impossible de rafraichir la messagerie. Reessayez.");
+      }
+      return null;
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleOpenChat = async () => {
     setError('');
-    if (!openim?.im_token || !openim?.chat_token || !openim?.user_id) {
-      setError("La session de messagerie n'est pas encore active. Reconnectez-vous d'abord.");
-      return;
+    let openim = getOpenIM();
+    if (!openim?.im_token || !openim?.chat_token || !openim?.user_id || isOpenIMStale(openim)) {
+      openim = await refreshOpenIM();
+      if (!openim?.im_token || !openim?.chat_token || !openim?.user_id) {
+        setError("La session de messagerie n'est pas encore active. Reconnectez-vous d'abord.");
+        return;
+      }
     }
     if (!OPENIM_WEB_URL) {
       setError("URL de la messagerie indisponible.");
@@ -92,8 +126,8 @@ export const Messagerie = () => {
               <p className="text-sm text-[#475569] mb-4">
                 Cliquez sur le bouton pour ouvrir la messagerie. Une nouvelle fenêtre s'ouvrira.
               </p>
-              <Button className="btn-green" onClick={handleOpenChat}>
-                Ouvrir la messagerie
+              <Button className="btn-green" onClick={handleOpenChat} disabled={refreshing}>
+                {refreshing ? 'Connexion en cours...' : 'Ouvrir la messagerie'}
               </Button>
             </div>
           </div>
