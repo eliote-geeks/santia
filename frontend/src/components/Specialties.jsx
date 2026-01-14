@@ -1,15 +1,7 @@
 import { Link } from 'react-router-dom';
-import { Heart, ShieldAlert, Scale, Moon, Sparkles, Baby, Stethoscope, ArrowRight } from 'lucide-react';
+import { Heart, ShieldAlert, Scale, Moon, Sparkles, Stethoscope, ArrowRight } from 'lucide-react';
 
 const specialties = [
-  {
-    id: 'sante-sexuelle',
-    title: 'Santé sexuelle',
-    description: 'Troubles érectiles, IST, contraception...',
-    icon: Heart,
-    color: 'bg-rose-50',
-    iconColor: 'text-rose-500'
-  },
   {
     id: 'generale',
     title: 'Générale',
@@ -19,20 +11,28 @@ const specialties = [
     iconColor: 'text-blue-600'
   },
   {
-    id: 'addictions',
-    title: 'Addictions',
-    description: 'Tabac, alcool, dépendances...',
-    icon: ShieldAlert,
-    color: 'bg-amber-50',
-    iconColor: 'text-amber-600'
-  },
-  {
     id: 'perte-de-poids',
     title: 'Perte de poids',
     description: 'Nutrition, régimes, suivi médical...',
     icon: Scale,
     color: 'bg-emerald-50',
     iconColor: 'text-emerald-600'
+  },
+  {
+    id: 'sante-sexuelle',
+    title: 'Santé sexuelle',
+    description: 'Troubles érectiles, IST, contraception...',
+    icon: Heart,
+    color: 'bg-rose-50',
+    iconColor: 'text-rose-500'
+  },
+  {
+    id: 'addictions',
+    title: 'Addictions',
+    description: 'Tabac, alcool, dépendances...',
+    icon: ShieldAlert,
+    color: 'bg-amber-50',
+    iconColor: 'text-amber-600'
   },
   {
     id: 'sommeil',
@@ -49,14 +49,6 @@ const specialties = [
     icon: Sparkles,
     color: 'bg-purple-50',
     iconColor: 'text-purple-600'
-  },
-  {
-    id: 'fertilite',
-    title: 'Fertilité',
-    description: 'Bilan, conseils, accompagnement...',
-    icon: Baby,
-    color: 'bg-sky-50',
-    iconColor: 'text-sky-600'
   }
 ];
 
@@ -69,7 +61,7 @@ export const Specialties = () => {
             Choisissez votre pathologie
           </h2>
           <p className="text-lg text-[#64748B] max-w-2xl mx-auto animate-fade-in-up stagger-1" data-testid="specialties-subtitle">
-            Perte de poids, santé sexuelle, addictions, sommeil... Sélectionnez la catégorie qui vous concerne.
+            Consultation generale, perte de poids, sante sexuelle, addictions... Selectionnez la categorie qui vous concerne.
           </p>
         </div>
 

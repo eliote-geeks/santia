@@ -56,6 +56,16 @@ export const Footer = () => {
             <h4 className="font-bold text-lg mb-4">Spécialités</h4>
             <ul className="space-y-3">
               <li>
+                <Link to="/consultation?category=generale" className="text-white/70 hover:text-[#2ECC71] transition-colors duration-200">
+                  Générale
+                </Link>
+              </li>
+              <li>
+                <Link to="/consultation?category=perte-de-poids" className="text-white/70 hover:text-[#2ECC71] transition-colors duration-200">
+                  Perte de poids
+                </Link>
+              </li>
+              <li>
                 <Link to="/consultation?category=sante-sexuelle" className="text-white/70 hover:text-[#2ECC71] transition-colors duration-200">
                   Santé sexuelle
                 </Link>
@@ -63,11 +73,6 @@ export const Footer = () => {
               <li>
                 <Link to="/consultation?category=addictions" className="text-white/70 hover:text-[#2ECC71] transition-colors duration-200">
                   Addictions
-                </Link>
-              </li>
-              <li>
-                <Link to="/consultation?category=perte-de-poids" className="text-white/70 hover:text-[#2ECC71] transition-colors duration-200">
-                  Perte de poids
                 </Link>
               </li>
               <li>

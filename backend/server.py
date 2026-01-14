@@ -583,6 +583,7 @@ class DoctorCreate(BaseModel):
     email: EmailStr
     phone: str
     specialty: str
+    category: str = "generale"
     openemr_provider_id: Optional[str] = None
 
 class DoctorResponse(BaseModel):
@@ -593,6 +594,7 @@ class DoctorResponse(BaseModel):
     email: EmailStr
     phone: str
     specialty: str
+    category: Optional[str] = None
     openemr_provider_id: Optional[str] = None
     openim_user_id: Optional[str] = None
     created_at: str
@@ -600,6 +602,12 @@ class DoctorResponse(BaseModel):
 class DoctorCreateResponse(DoctorResponse):
     openim_password: Optional[str] = None
     openim_created: bool = False
+
+class DoctorPublicResponse(BaseModel):
+    id: str
+    name: str
+    specialty: str
+    category: Optional[str] = None
 
 class DoctorSeedResponse(BaseModel):
     created: List[DoctorCreateResponse]
@@ -613,6 +621,7 @@ class DoctorSummary(BaseModel):
     specialty: str
     email: EmailStr
     phone: str
+    category: Optional[str] = None
     openemr_provider_id: Optional[str] = None
     openim_user_id: Optional[str] = None
 
@@ -828,6 +837,25 @@ async def get_doctors(_: dict = Depends(require_admin)):
     )
     return doctors
 
+@api_router.get("/doctors/public", response_model=List[DoctorPublicResponse])
+async def get_public_doctors(category: Optional[str] = None):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Base de donnees indisponible")
+    doctors = await fetch_doctors_for_category(category)
+    if not doctors and category:
+        doctors = await fetch_doctors_for_category("generale")
+    if not doctors:
+        doctors = await fetch_doctors_for_category(None)
+    return [
+        DoctorPublicResponse(
+            id=doctor.get("id", ""),
+            name=doctor.get("name", ""),
+            specialty=doctor.get("specialty", ""),
+            category=doctor.get("category"),
+        )
+        for doctor in doctors
+    ]
+
 @api_router.get("/patients", response_model=List[UserResponse])
 async def get_patients(_: dict = Depends(require_admin)):
     if db is None:
@@ -839,11 +867,52 @@ async def get_patients(_: dict = Depends(require_admin)):
     )
     return [UserResponse(**sanitize_user(user)) for user in patients]
 
+async def fetch_doctors_for_category(category: Optional[str]) -> List[dict]:
+    if db is None:
+        return []
+    query = {}
+    if category:
+        if category == "generale":
+            query = {"$or": [{"category": "generale"}, {"category": {"$exists": False}}]}
+        else:
+            query = {"category": category}
+    doctors = (
+        await db.doctors.find(query, {"_id": 0})
+        .sort("created_at", -1)
+        .to_list(1000)
+    )
+    return doctors
+
+def build_doctor_summary(doctor: dict) -> dict:
+    return {
+        "id": doctor.get("id", ""),
+        "name": doctor.get("name", ""),
+        "specialty": doctor.get("specialty", ""),
+        "email": doctor.get("email", ""),
+        "phone": doctor.get("phone", ""),
+        "category": doctor.get("category"),
+        "openemr_provider_id": doctor.get("openemr_provider_id"),
+        "openim_user_id": doctor.get("openim_user_id"),
+    }
+
+async def pick_doctor_for_category(category: str) -> Optional[dict]:
+    doctors = await fetch_doctors_for_category(category)
+    if not doctors and category != "generale":
+        doctors = await fetch_doctors_for_category("generale")
+    if not doctors and db is not None:
+        doctors = (
+            await db.doctors.find({}, {"_id": 0})
+            .sort("created_at", -1)
+            .to_list(1000)
+        )
+    return doctors[0] if doctors else None
+
 async def create_doctor_record(input: DoctorCreate) -> DoctorCreateResponse:
     email = input.email.lower()
     doctor_id = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
     openemr_provider_id = input.openemr_provider_id.strip() if input.openemr_provider_id else None
+    category = (input.category or "generale").strip() or "generale"
     openim_user_id = None
     openim_password = None
     openim_created = False
@@ -871,6 +940,7 @@ async def create_doctor_record(input: DoctorCreate) -> DoctorCreateResponse:
         "email": email,
         "phone": input.phone.strip(),
         "specialty": input.specialty.strip(),
+        "category": category,
         "openemr_provider_id": openemr_provider_id,
         "openim_user_id": openim_user_id,
         "created_at": created_at,
@@ -903,36 +973,42 @@ async def seed_doctors(_: dict = Depends(require_admin)):
             email="sandrine.mbida@santia.care",
             phone="+237 6 70 11 22 33",
             specialty="Nutrition et perte de poids",
+            category="perte-de-poids",
         ),
         DoctorCreate(
             name="Alain Njoya",
             email="alain.njoya@santia.care",
             phone="+237 6 91 23 45 67",
             specialty="Addictologie",
+            category="addictions",
         ),
         DoctorCreate(
             name="Prisca Fotsing",
             email="prisca.fotsing@santia.care",
             phone="+237 6 88 32 10 98",
             specialty="Sante sexuelle",
+            category="sante-sexuelle",
         ),
         DoctorCreate(
             name="Armand Tchokote",
             email="armand.tchokote@santia.care",
             phone="+237 6 75 44 33 22",
             specialty="Medecine generale",
+            category="generale",
         ),
         DoctorCreate(
             name="Aline Kengne",
             email="aline.kengne@santia.care",
             phone="+237 6 50 98 76 54",
             specialty="Sommeil et stress",
+            category="sommeil",
         ),
         DoctorCreate(
             name="Serge Mbarga",
             email="serge.mbarga@santia.care",
             phone="+237 6 96 55 44 11",
             specialty="Dermatologie et cheveux",
+            category="cheveux",
         ),
     ]
 
@@ -964,6 +1040,13 @@ async def create_intake(input: IntakeCreate, current_user: dict = Depends(get_cu
         except OpenEMRError as exc:
             logger.error("OpenEMR integration failed: %s", exc)
             raise HTTPException(status_code=502, detail="Erreur lors de la creation du dossier patient")
+
+    assigned_doctor = None
+    if db is not None:
+        assigned_doctor = await pick_doctor_for_category(input.category)
+    patient_openim_id = current_user.get("openim_user_id")
+    doctor_openim_id = assigned_doctor.get("openim_user_id") if assigned_doctor else None
+    doctor_summary = build_doctor_summary(assigned_doctor) if assigned_doctor else None
     
     doc = {
         "id": intake_id,
@@ -984,10 +1067,10 @@ async def create_intake(input: IntakeCreate, current_user: dict = Depends(get_cu
         "meeting_url": None,
         "whatsapp_link": None,
         "user_id": current_user.get("id"),
-        "assigned_doctor_id": None,
-        "assigned_doctor": None,
-        "openim_patient_id": None,
-        "openim_doctor_id": None,
+        "assigned_doctor_id": assigned_doctor.get("id") if assigned_doctor else None,
+        "assigned_doctor": doctor_summary,
+        "openim_patient_id": patient_openim_id if patient_openim_id else None,
+        "openim_doctor_id": doctor_openim_id if doctor_openim_id else None,
         "openim_intro_sent": False,
         "openemr_patient_id": openemr_patient_id,
         "openemr_appointment_id": None,
@@ -995,6 +1078,30 @@ async def create_intake(input: IntakeCreate, current_user: dict = Depends(get_cu
     
     if db is not None:
         await db.intakes.insert_one(doc)
+
+    if assigned_doctor and patient_openim_id and doctor_openim_id and openim_client.can_send_message():
+        patient_name = doc.get("name", "Patient")
+        doctor_name = assigned_doctor.get("name", "Votre medecin")
+        intro = (
+            f"Bonjour {patient_name}, je suis Dr {doctor_name}. "
+            "Je vais assurer votre teleconsultation. "
+            "Vous pouvez m ecrire ici pour preparer le rendez-vous."
+        )
+        try:
+            await asyncio.to_thread(
+                openim_client.send_text_message,
+                doctor_openim_id,
+                patient_openim_id,
+                intro,
+            )
+            doc["openim_intro_sent"] = True
+            if db is not None:
+                await db.intakes.update_one(
+                    {"id": intake_id},
+                    {"$set": {"openim_intro_sent": True}},
+                )
+        except OpenIMError as exc:
+            logger.warning("OpenIM intro message failed: %s", exc)
     
     # Return without _id
     if "_id" in doc:
@@ -1081,15 +1188,7 @@ async def assign_doctor(intake_id: str, input: IntakeAssignDoctor, _: dict = Dep
     if not doctor:
         raise HTTPException(status_code=404, detail="Medecin introuvable")
 
-    doctor_summary = {
-        "id": doctor["id"],
-        "name": doctor["name"],
-        "specialty": doctor.get("specialty", ""),
-        "email": doctor.get("email", ""),
-        "phone": doctor.get("phone", ""),
-        "openemr_provider_id": doctor.get("openemr_provider_id"),
-        "openim_user_id": doctor.get("openim_user_id"),
-    }
+    doctor_summary = build_doctor_summary(doctor)
     update_fields = {
         "assigned_doctor_id": doctor["id"],
         "assigned_doctor": doctor_summary,

@@ -11,7 +11,6 @@ import {
   Scale,
   Moon,
   Sparkles,
-  Baby,
   Stethoscope,
   Check,
   AlertTriangle,
@@ -48,13 +47,12 @@ const PAYMENT_AMOUNT = 10000;
 const BOOKING_STORAGE_KEY = 'santia_booking';
 
 const categories = [
-  { id: 'sante-sexuelle', title: 'Santé sexuelle', icon: Heart, color: 'bg-rose-50', iconColor: 'text-rose-500' },
   { id: 'generale', title: 'Générale', icon: Stethoscope, color: 'bg-blue-50', iconColor: 'text-blue-600' },
-  { id: 'addictions', title: 'Addictions', icon: ShieldAlert, color: 'bg-amber-50', iconColor: 'text-amber-600' },
   { id: 'perte-de-poids', title: 'Perte de poids', icon: Scale, color: 'bg-emerald-50', iconColor: 'text-emerald-600' },
+  { id: 'sante-sexuelle', title: 'Santé sexuelle', icon: Heart, color: 'bg-rose-50', iconColor: 'text-rose-500' },
+  { id: 'addictions', title: 'Addictions', icon: ShieldAlert, color: 'bg-amber-50', iconColor: 'text-amber-600' },
   { id: 'sommeil', title: 'Sommeil', icon: Moon, color: 'bg-indigo-50', iconColor: 'text-indigo-600' },
-  { id: 'cheveux', title: 'Cheveux', icon: Sparkles, color: 'bg-purple-50', iconColor: 'text-purple-600' },
-  { id: 'fertilite', title: 'Fertilité', icon: Baby, color: 'bg-sky-50', iconColor: 'text-sky-600' }
+  { id: 'cheveux', title: 'Cheveux', icon: Sparkles, color: 'bg-purple-50', iconColor: 'text-purple-600' }
 ];
 
 const durations = [
@@ -130,6 +128,9 @@ export const Consultation = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
   const [paymentConfirmOpen, setPaymentConfirmOpen] = useState(false);
+  const [availableDoctors, setAvailableDoctors] = useState([]);
+  const [doctorsLoading, setDoctorsLoading] = useState(false);
+  const [doctorsError, setDoctorsError] = useState('');
 
   const scheduleSlots = useMemo(() => buildScheduleSlots(), []);
 
@@ -174,6 +175,31 @@ export const Consultation = () => {
       setFormData(prev => ({ ...prev, paymentPhone: prev.phone }));
     }
   }, [formData.phone, formData.paymentPhone]);
+
+  useEffect(() => {
+    if (!formData.category) {
+      setAvailableDoctors([]);
+      setDoctorsError('');
+      return;
+    }
+    const fetchDoctors = async () => {
+      if (!API_URL) return;
+      setDoctorsLoading(true);
+      setDoctorsError('');
+      try {
+        const response = await axios.get(`${API_URL}/api/doctors/public`, {
+          params: { category: formData.category }
+        });
+        setAvailableDoctors(response.data || []);
+      } catch (error) {
+        setDoctorsError('Impossible de charger les medecins pour cette categorie.');
+        setAvailableDoctors([]);
+      } finally {
+        setDoctorsLoading(false);
+      }
+    };
+    fetchDoctors();
+  }, [formData.category]);
 
   const updateFormData = (field, value) => {
     setFormData(prev => {
@@ -425,6 +451,42 @@ export const Consultation = () => {
                   })}
                 </div>
                 {errors.category && <p className="text-red-500 text-sm mt-4">{errors.category}</p>}
+
+                {formData.category && (
+                  <div className="mt-8 bg-[#F8FAFC] border border-slate-200 rounded-2xl p-5">
+                    <h3 className="text-sm font-semibold text-[#0A2540] mb-2">Medecins disponibles</h3>
+                    <p className="text-xs text-[#64748B] mb-4">
+                      Un medecin sera automatiquement propose selon votre pathologie.
+                    </p>
+                    {doctorsLoading ? (
+                      <div className="flex items-center gap-2 text-xs text-[#64748B]">
+                        <Loader2 className="w-4 h-4 animate-spin text-[#2ECC71]" />
+                        Chargement des medecins...
+                      </div>
+                    ) : doctorsError ? (
+                      <div className="text-xs text-red-600">{doctorsError}</div>
+                    ) : availableDoctors.length === 0 ? (
+                      <div className="text-xs text-[#64748B]">Aucun medecin disponible pour le moment.</div>
+                    ) : (
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        {availableDoctors.slice(0, 4).map((doctor, index) => (
+                          <div
+                            key={doctor.id}
+                            className={`border rounded-xl p-3 ${
+                              index === 0 ? 'border-[#2ECC71] bg-white' : 'border-slate-200 bg-white'
+                            }`}
+                          >
+                            <p className="text-sm font-semibold text-[#0A2540]">Dr {doctor.name}</p>
+                            <p className="text-xs text-[#64748B]">{doctor.specialty}</p>
+                            {index === 0 && (
+                              <p className="text-[11px] text-[#2ECC71] font-medium mt-1">Medecin recommande</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

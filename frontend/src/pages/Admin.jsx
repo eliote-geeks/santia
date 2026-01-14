@@ -22,14 +22,23 @@ const statusLabel = {
 };
 
 const categoryLabels = {
-  'sante-sexuelle': 'Sante sexuelle',
   generale: 'Generale',
+  'sante-sexuelle': 'Sante sexuelle',
   addictions: 'Addictions',
   'perte-de-poids': 'Perte de poids',
   sommeil: 'Sommeil',
   cheveux: 'Cheveux',
   fertilite: 'Fertilite'
 };
+
+const doctorCategories = [
+  { value: 'generale', label: 'Generale' },
+  { value: 'perte-de-poids', label: 'Perte de poids' },
+  { value: 'sante-sexuelle', label: 'Sante sexuelle' },
+  { value: 'addictions', label: 'Addictions' },
+  { value: 'sommeil', label: 'Sommeil' },
+  { value: 'cheveux', label: 'Cheveux' }
+];
 
 const formatDateTime = (value) => {
   if (!value) return 'A planifier';
@@ -68,6 +77,7 @@ export const Admin = () => {
     email: '',
     phone: '',
     specialty: '',
+    category: 'generale',
     openemr_provider_id: ''
   });
   const [doctorSubmitting, setDoctorSubmitting] = useState(false);
@@ -181,6 +191,7 @@ export const Admin = () => {
         email: '',
         phone: '',
         specialty: '',
+        category: 'generale',
         openemr_provider_id: ''
       });
       if (openim_created && openim_password) {
@@ -389,6 +400,20 @@ export const Admin = () => {
                 />
               </div>
               <div className="grid gap-2">
+                <label className="text-sm font-medium text-[#0A2540]">Categorie</label>
+                <select
+                  className="input-santia"
+                  value={doctorForm.category}
+                  onChange={(event) => handleDoctorFormChange('category', event.target.value)}
+                >
+                  {doctorCategories.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid gap-2">
                 <label className="text-sm font-medium text-[#0A2540]">Email</label>
                 <input
                   type="email"
@@ -440,11 +465,14 @@ export const Admin = () => {
                     <div className="text-sm text-[#64748B]">Aucun medecin enregistre pour le moment.</div>
                   )}
                   {doctors.map((doctor) => (
-                    <div key={doctor.id} className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border border-slate-200 rounded-xl px-4 py-3">
-                      <div>
-                        <p className="font-semibold text-[#0A2540]">Dr {doctor.name}</p>
-                        <p className="text-sm text-[#64748B]">{doctor.specialty} · {doctor.email}</p>
-                      </div>
+                  <div key={doctor.id} className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border border-slate-200 rounded-xl px-4 py-3">
+                    <div>
+                      <p className="font-semibold text-[#0A2540]">Dr {doctor.name}</p>
+                      <p className="text-sm text-[#64748B]">
+                        {doctor.specialty} · {doctor.email}
+                        {doctor.category && ` · ${categoryLabels[doctor.category] || doctor.category}`}
+                      </p>
+                    </div>
                       <div className="text-xs text-[#64748B] space-y-1">
                         <p>Tel: {doctor.phone}</p>
                         {doctor.openemr_provider_id && <p>OpenEMR: {doctor.openemr_provider_id}</p>}
