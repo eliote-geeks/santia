@@ -58,6 +58,12 @@ export const PatientProfile = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const welcomeType = location.state?.welcome;
+  const welcomeMessage = welcomeType === 'register'
+    ? 'Bienvenue sur Santia. Votre compte est cree.'
+    : welcomeType === 'login'
+      ? 'Bon retour. Votre espace patient est pret.'
+      : '';
   const [intake, setIntake] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -158,6 +164,12 @@ export const PatientProfile = () => {
               </p>
             </div>
           </div>
+
+          {welcomeMessage && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-8">
+              <p className="text-sm text-emerald-700">{welcomeMessage}</p>
+            </div>
+          )}
 
           {loading && (
             <div className="flex items-center justify-center py-20" data-testid="profile-loading">

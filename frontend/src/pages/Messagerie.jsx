@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { Button } from '../components/ui/button';
@@ -18,6 +18,13 @@ const encodePayload = (payload) => {
 
 export const Messagerie = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const welcomeType = location.state?.welcome;
+  const welcomeMessage = welcomeType === 'login'
+    ? 'Bon retour. Votre messagerie est prete.'
+    : welcomeType === 'register'
+      ? 'Bienvenue. Votre messagerie est prete.'
+      : '';
   const [error, setError] = useState('');
   const openim = getOpenIM();
 
@@ -65,6 +72,12 @@ export const Messagerie = () => {
             <p className="text-sm text-[#64748B] mb-6">
               Discutez avec votre médecin dans un espace dédié et sécurisé.
             </p>
+
+            {welcomeMessage && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-sm text-emerald-700 mb-6">
+                {welcomeMessage}
+              </div>
+            )}
 
             {error && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-700 mb-6">

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { Button } from '../components/ui/button';
@@ -45,6 +45,13 @@ const formatDateTime = (value) => {
 
 export const Admin = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const welcomeType = location.state?.welcome;
+  const welcomeMessage = welcomeType === 'login'
+    ? 'Bon retour. Le tableau de bord est pret.'
+    : welcomeType === 'register'
+      ? 'Bienvenue. Le compte admin est actif.'
+      : '';
   const [intakes, setIntakes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -267,6 +274,12 @@ export const Admin = () => {
               Rafraichir
             </Button>
           </div>
+
+          {welcomeMessage && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-6 text-sm text-emerald-700">
+              {welcomeMessage}
+            </div>
+          )}
 
           <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 mb-8">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
