@@ -24,11 +24,11 @@ export const Navbar = () => {
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
           <Link to="/" className="flex items-center" data-testid="navbar-logo">
-            <div className="bg-[#0A2540] rounded-xl px-4 py-2">
+            <div className="bg-[#0A2540] rounded-2xl h-16 w-24 flex items-center justify-center">
               <img
                 src="/images/logo_rm_transparent.png"
                 alt="Santia Logo"
-                className="h-12 w-auto"
+                className="h-12 md:h-14 w-auto"
               />
             </div>
           </Link>

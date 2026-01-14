@@ -85,6 +85,7 @@ def dob_from_age(age: int) -> str:
 def category_label(category_id: str) -> str:
     mapping = {
         "sante-sexuelle": "Sante sexuelle",
+        "generale": "Generale",
         "addictions": "Addictions",
         "perte-de-poids": "Perte de poids",
         "sommeil": "Sommeil",
@@ -585,6 +586,10 @@ class DoctorCreateResponse(DoctorResponse):
     openim_password: Optional[str] = None
     openim_created: bool = False
 
+class DoctorSeedResponse(BaseModel):
+    created: List[DoctorCreateResponse]
+    skipped: List[str]
+
 class DoctorSummary(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -777,15 +782,8 @@ async def get_patients(_: dict = Depends(require_admin)):
     )
     return [UserResponse(**sanitize_user(user)) for user in patients]
 
-@api_router.post("/doctors", response_model=DoctorCreateResponse)
-async def create_doctor(input: DoctorCreate, _: dict = Depends(require_admin)):
-    if db is None:
-        raise HTTPException(status_code=503, detail="Base de donnees indisponible")
+async def create_doctor_record(input: DoctorCreate) -> DoctorCreateResponse:
     email = input.email.lower()
-    existing = await db.doctors.find_one({"email": email})
-    if existing:
-        raise HTTPException(status_code=400, detail="Email deja utilise")
-
     doctor_id = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
     openemr_provider_id = input.openemr_provider_id.strip() if input.openemr_provider_id else None
@@ -826,6 +824,72 @@ async def create_doctor(input: DoctorCreate, _: dict = Depends(require_admin)):
         openim_password=openim_password,
         openim_created=openim_created,
     )
+
+@api_router.post("/doctors", response_model=DoctorCreateResponse)
+async def create_doctor(input: DoctorCreate, _: dict = Depends(require_admin)):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Base de donnees indisponible")
+    email = input.email.lower()
+    existing = await db.doctors.find_one({"email": email})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email deja utilise")
+    return await create_doctor_record(input)
+
+@api_router.post("/doctors/seed", response_model=DoctorSeedResponse)
+async def seed_doctors(_: dict = Depends(require_admin)):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Base de donnees indisponible")
+
+    samples = [
+        DoctorCreate(
+            name="Sandrine Mbida",
+            email="sandrine.mbida@santia.care",
+            phone="+237 6 70 11 22 33",
+            specialty="Nutrition et perte de poids",
+        ),
+        DoctorCreate(
+            name="Alain Njoya",
+            email="alain.njoya@santia.care",
+            phone="+237 6 91 23 45 67",
+            specialty="Addictologie",
+        ),
+        DoctorCreate(
+            name="Prisca Fotsing",
+            email="prisca.fotsing@santia.care",
+            phone="+237 6 88 32 10 98",
+            specialty="Sante sexuelle",
+        ),
+        DoctorCreate(
+            name="Armand Tchokote",
+            email="armand.tchokote@santia.care",
+            phone="+237 6 75 44 33 22",
+            specialty="Medecine generale",
+        ),
+        DoctorCreate(
+            name="Aline Kengne",
+            email="aline.kengne@santia.care",
+            phone="+237 6 50 98 76 54",
+            specialty="Sommeil et stress",
+        ),
+        DoctorCreate(
+            name="Serge Mbarga",
+            email="serge.mbarga@santia.care",
+            phone="+237 6 96 55 44 11",
+            specialty="Dermatologie et cheveux",
+        ),
+    ]
+
+    created = []
+    skipped = []
+    for sample in samples:
+        email = sample.email.lower()
+        existing = await db.doctors.find_one({"email": email})
+        if existing:
+            skipped.append(email)
+            continue
+        created.append(await create_doctor_record(sample))
+
+    return DoctorSeedResponse(created=created, skipped=skipped)
 
 # Intake Form Endpoint
 @api_router.post("/intake", response_model=IntakeResponse)

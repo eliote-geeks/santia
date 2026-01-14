@@ -27,6 +27,7 @@ const statusMeta = {
 
 const categoryLabels = {
   'sante-sexuelle': 'Sante sexuelle',
+  generale: 'Generale',
   addictions: 'Addictions',
   'perte-de-poids': 'Perte de poids',
   sommeil: 'Sommeil',

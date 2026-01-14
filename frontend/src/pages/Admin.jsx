@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { Button } from '../components/ui/button';
-import { Calendar, Clock, ExternalLink, Loader2, MessageSquare, RefreshCw } from 'lucide-react';
+import { Calendar, Clock, ExternalLink, Loader2, MessageSquare, RefreshCw, UserPlus } from 'lucide-react';
 import { authHeaders, getToken, getUser } from '../lib/auth';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -23,6 +23,7 @@ const statusLabel = {
 
 const categoryLabels = {
   'sante-sexuelle': 'Sante sexuelle',
+  generale: 'Generale',
   addictions: 'Addictions',
   'perte-de-poids': 'Perte de poids',
   sommeil: 'Sommeil',
@@ -70,6 +71,9 @@ export const Admin = () => {
     openemr_provider_id: ''
   });
   const [doctorSubmitting, setDoctorSubmitting] = useState(false);
+  const [seedLoading, setSeedLoading] = useState(false);
+  const [seedMessage, setSeedMessage] = useState('');
+  const [seedDetails, setSeedDetails] = useState([]);
   const [scheduleValues, setScheduleValues] = useState({});
   const [meetingOverrides, setMeetingOverrides] = useState({});
   const [savingId, setSavingId] = useState(null);
@@ -191,6 +195,38 @@ export const Admin = () => {
     }
   };
 
+  const handleSeedDoctors = async () => {
+    setSeedLoading(true);
+    setDoctorError('');
+    setDoctorSuccess('');
+    setSeedMessage('');
+    setSeedDetails([]);
+    try {
+      const response = await axios.post(`${API_URL}/api/doctors/seed`, {}, { headers: authHeaders() });
+      const created = response.data?.created || [];
+      const skipped = response.data?.skipped || [];
+      setSeedDetails(
+        created.map((doctor) => ({
+          id: doctor.id,
+          name: doctor.name,
+          email: doctor.email,
+          openim_password: doctor.openim_password,
+          openim_created: doctor.openim_created
+        }))
+      );
+      const createdLabel = created.length
+        ? `${created.length} medecin(s) test ajoute(s).`
+        : 'Aucun nouveau medecin ajoute.';
+      const skippedLabel = skipped.length ? ` ${skipped.length} deja existant(s).` : '';
+      setSeedMessage(`${createdLabel}${skippedLabel}`);
+      await loadDoctors();
+    } catch (err) {
+      setDoctorError('Impossible d ajouter les medecins tests.');
+    } finally {
+      setSeedLoading(false);
+    }
+  };
+
   const handleAssignChange = (id, value) => {
     setAssignValues((prev) => ({ ...prev, [id]: value }));
   };
@@ -287,10 +323,16 @@ export const Admin = () => {
                 <h2 className="text-xl font-semibold text-[#0A2540]">Equipe medicale</h2>
                 <p className="text-sm text-[#64748B]">Ajoutez les medecins et assignez-les aux demandes.</p>
               </div>
-              <Button onClick={loadDoctors} variant="outline" className="flex items-center gap-2">
-                <RefreshCw className="w-4 h-4" />
-                Rafraichir medecins
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={loadDoctors} variant="outline" className="flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4" />
+                  Rafraichir medecins
+                </Button>
+                <Button onClick={handleSeedDoctors} variant="outline" className="flex items-center gap-2" disabled={seedLoading}>
+                  <UserPlus className="w-4 h-4" />
+                  {seedLoading ? 'Ajout en cours...' : 'Ajouter des medecins tests'}
+                </Button>
+              </div>
             </div>
 
             {doctorError && (
@@ -302,6 +344,24 @@ export const Admin = () => {
             {doctorSuccess && (
               <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mt-4 text-sm text-emerald-700">
                 {doctorSuccess}
+              </div>
+            )}
+
+            {seedMessage && (
+              <div className="bg-[#F8FAFC] border border-slate-200 rounded-xl p-4 mt-4 text-sm text-[#0A2540]">
+                <p className="font-medium">{seedMessage}</p>
+                {seedDetails.length > 0 && (
+                  <div className="mt-3 space-y-2 text-xs text-[#64748B]">
+                    {seedDetails.map((doctor) => (
+                      <div key={doctor.id}>
+                        Dr {doctor.name} · {doctor.email}
+                        {doctor.openim_created && doctor.openim_password
+                          ? ` · Mdp OpenIM: ${doctor.openim_password}`
+                          : ' · OpenIM non lie'}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
