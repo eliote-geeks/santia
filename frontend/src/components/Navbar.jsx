@@ -1,8 +1,15 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Menu, X, Phone } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Menu, X } from 'lucide-react';
 import { clearAuth, getToken, getUser } from '../lib/auth';
 import { NotificationBell } from './NotificationBell';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from './ui/dropdown-menu';
 
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -57,7 +64,7 @@ export const Navbar = () => {
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-8">
+          <div className="hidden md:flex items-center gap-6">
             <Link 
               to="/" 
               className={`text-sm font-medium transition-colors duration-200 ${
@@ -81,85 +88,69 @@ export const Navbar = () => {
             >
               Comment ça marche
             </Link>
-            <Link
-              to="/#faq"
-              className="text-sm font-medium text-[#0A2540] hover:text-[#2ECC71] transition-colors duration-200"
-              data-testid="nav-faq"
-            >
-              FAQ
-            </Link>
-            {isAuthed && !isAdmin && (
-              <Link
-                to="/dossier"
-                className={`text-sm font-medium transition-colors duration-200 ${
-                  isActive('/dossier') ? 'text-[#2ECC71]' : 'text-[#0A2540] hover:text-[#2ECC71]'
-                }`}
-              >
-                Mon dossier
-              </Link>
-            )}
-            {isAdmin && (
-              <Link
-                to="/admin"
-                className={`text-sm font-medium transition-colors duration-200 ${
-                  isActive('/admin') ? 'text-[#2ECC71]' : 'text-[#0A2540] hover:text-[#2ECC71]'
-                }`}
-              >
-                Administration
-              </Link>
-            )}
-            {isAuthed && !isAdmin && (
-              <Link
-                to="/messagerie"
-                className={`text-sm font-medium transition-colors duration-200 ${
-                  isActive('/messagerie') ? 'text-[#2ECC71]' : 'text-[#0A2540] hover:text-[#2ECC71]'
-                }`}
-              >
-                Messagerie
-              </Link>
-            )}
           </div>
 
           {/* CTA Button */}
           <div className="hidden md:flex items-center gap-4">
-            <a href="tel:+237657817198" className="flex items-center gap-2 text-sm text-[#64748B] hover:text-[#0A2540] transition-colors duration-200">
-              <Phone className="w-4 h-4" />
-              <span>+237 6 57 81 71 98</span>
-            </a>
             <NotificationBell />
-            {isAuthed ? (
-              <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  onClick={handleLogout}
-                  className="text-sm font-medium text-[#0A2540] hover:text-[#2ECC71] transition-colors duration-200"
+                  className="flex items-center gap-2 text-sm font-medium text-[#0A2540] px-3 py-2 rounded-xl border border-slate-200 hover:border-[#2ECC71] hover:text-[#2ECC71] transition-colors duration-200"
                 >
-                  Se deconnecter
+                  Menu
+                  <ChevronDown className="w-4 h-4" />
                 </button>
-                <Link
-                  to="/consultation"
-                  className="btn-primary text-sm py-3 px-6"
-                  data-testid="nav-cta-consultation"
-                >
-                  Commencer
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link
-                  to="/login"
-                  className="text-sm font-medium text-[#0A2540] hover:text-[#2ECC71] transition-colors duration-200"
-                >
-                  Se connecter
-                </Link>
-                <Link
-                  to="/register"
-                  className="btn-green text-sm py-3 px-6"
-                >
-                  Creer un compte
-                </Link>
-              </>
-            )}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                {isAuthed ? (
+                  <>
+                    <DropdownMenuItem asChild className="cursor-pointer">
+                      <Link to={isAdmin ? '/admin' : '/dossier'}>
+                        {isAdmin ? 'Administration' : 'Mon dossier'}
+                      </Link>
+                    </DropdownMenuItem>
+                    {!isAdmin && (
+                      <DropdownMenuItem asChild className="cursor-pointer">
+                        <Link to="/messagerie">Messagerie</Link>
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onSelect={handleLogout}
+                      className="cursor-pointer text-red-600 focus:text-red-600"
+                    >
+                      Se deconnecter
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                ) : (
+                  <>
+                    <DropdownMenuItem asChild className="cursor-pointer">
+                      <Link to="/login">Se connecter</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="cursor-pointer">
+                      <Link to="/register">Creer un compte</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                <DropdownMenuItem asChild className="cursor-pointer">
+                  <Link to="/#faq">FAQ</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild className="cursor-pointer">
+                  <a href="tel:+237657817198">Appeler +237 6 57 81 71 98</a>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Link
+              to="/consultation"
+              className="btn-primary text-sm py-3 px-6"
+              data-testid="nav-cta-consultation"
+            >
+              Commencer
+            </Link>
           </div>
 
           {/* Mobile Menu Button */}
