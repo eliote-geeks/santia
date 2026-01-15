@@ -40,6 +40,7 @@ import {
 } from '../components/ui/select';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { getToken, authHeaders } from '../lib/auth';
+import { addNotification } from '../lib/notifications';
 import { toast } from '../hooks/use-toast';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -287,6 +288,11 @@ export const Consultation = () => {
       paymentReference: reference
     }));
     setErrors(prev => ({ ...prev, paymentConfirmed: null }));
+    addNotification({
+      title: 'Paiement simule',
+      description: `Reference ${reference}`,
+      type: 'payment',
+    });
     toast({
       title: 'Paiement simule',
       description: `Reference ${reference}`,
@@ -362,6 +368,11 @@ export const Consultation = () => {
       };
       localStorage.setItem(BOOKING_STORAGE_KEY, JSON.stringify(booking));
 
+      addNotification({
+        title: 'Rendez-vous envoye',
+        description: 'Votre demande est en attente de confirmation.',
+        type: 'appointment',
+      });
       toast({
         title: 'Demande envoyee',
         description: 'Votre rendez-vous est en attente de confirmation.',

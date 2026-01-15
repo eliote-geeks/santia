@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Menu, X, Phone } from 'lucide-react';
 import { clearAuth, getToken, getUser } from '../lib/auth';
+import { NotificationBell } from './NotificationBell';
 
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -125,6 +126,7 @@ export const Navbar = () => {
               <Phone className="w-4 h-4" />
               <span>+237 6 57 81 71 98</span>
             </a>
+            <NotificationBell />
             {isAuthed ? (
               <>
                 <button
@@ -161,14 +163,17 @@ export const Navbar = () => {
           </div>
 
           {/* Mobile Menu Button */}
-          <button 
-            className="md:hidden p-2 rounded-lg hover:bg-slate-100 transition-colors duration-200"
-            onClick={() => setIsOpen(!isOpen)}
-            data-testid="mobile-menu-toggle"
-            aria-label="Toggle menu"
-          >
-            {isOpen ? <X className="w-6 h-6 text-[#0A2540]" /> : <Menu className="w-6 h-6 text-[#0A2540]" />}
-          </button>
+          <div className="md:hidden flex items-center gap-2">
+            <NotificationBell className="h-9 w-9" iconClassName="w-4 h-4" />
+            <button 
+              className="p-2 rounded-lg hover:bg-slate-100 transition-colors duration-200"
+              onClick={() => setIsOpen(!isOpen)}
+              data-testid="mobile-menu-toggle"
+              aria-label="Toggle menu"
+            >
+              {isOpen ? <X className="w-6 h-6 text-[#0A2540]" /> : <Menu className="w-6 h-6 text-[#0A2540]" />}
+            </button>
+          </div>
         </div>
       </div>
 

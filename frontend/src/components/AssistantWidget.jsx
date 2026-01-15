@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { toast } from '../hooks/use-toast';
+import { addNotification } from '../lib/notifications';
 
 const starterMessages = [
   {
@@ -44,6 +45,11 @@ export const AssistantWidget = () => {
     if (!trimmed) return;
     pushMessage(trimmed, 'patient');
     setChatInput('');
+    addNotification({
+      title: 'Message envoye',
+      description: 'Votre message a ete transmis a Santy.',
+      type: 'message',
+    });
     toast({
       title: 'Message envoye',
       description: 'Santy prepare votre reponse.',
@@ -55,6 +61,11 @@ export const AssistantWidget = () => {
 
   const handleQuickAction = (message) => {
     pushMessage(message, 'patient');
+    addNotification({
+      title: 'Message envoye',
+      description: 'Votre demande est en cours de traitement.',
+      type: 'message',
+    });
     toast({
       title: 'Message envoye',
       description: 'Votre demande est transmise.',
