@@ -7,6 +7,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { setAuth, setOpenIM } from '../lib/auth';
+import { toast } from '../hooks/use-toast';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -31,6 +32,11 @@ export const Register = () => {
     setError('');
     if (formData.password !== formData.confirm_password) {
       setError('Les mots de passe ne correspondent pas.');
+      toast({
+        title: 'Mot de passe invalide',
+        description: 'Les mots de passe ne correspondent pas.',
+        variant: 'destructive',
+      });
       return;
     }
     setLoading(true);
@@ -44,9 +50,18 @@ export const Register = () => {
       const response = await axios.post(`${API_URL}/api/auth/register`, payload);
       setAuth(response.data.access_token, response.data.user);
       setOpenIM(response.data.openim);
+      toast({
+        title: 'Compte cree',
+        description: 'Bienvenue sur Santia.',
+      });
       navigate('/dossier', { state: { welcome: 'register' } });
     } catch (err) {
       setError('Impossible de creer le compte.');
+      toast({
+        title: 'Inscription echouee',
+        description: 'Impossible de creer le compte.',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }

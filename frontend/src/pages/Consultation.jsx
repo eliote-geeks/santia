@@ -40,6 +40,7 @@ import {
 } from '../components/ui/select';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { getToken, authHeaders } from '../lib/auth';
+import { toast } from '../hooks/use-toast';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 const MEETING_BASE_URL = (process.env.REACT_APP_JITSI_URL || 'https://meet.jit.si').replace(/\/$/, '');
@@ -286,6 +287,10 @@ export const Consultation = () => {
       paymentReference: reference
     }));
     setErrors(prev => ({ ...prev, paymentConfirmed: null }));
+    toast({
+      title: 'Paiement simule',
+      description: `Reference ${reference}`,
+    });
   };
 
   const requestPaymentConfirmation = () => {
@@ -357,10 +362,19 @@ export const Consultation = () => {
       };
       localStorage.setItem(BOOKING_STORAGE_KEY, JSON.stringify(booking));
 
+      toast({
+        title: 'Demande envoyee',
+        description: 'Votre rendez-vous est en attente de confirmation.',
+      });
       navigate('/confirmation');
     } catch (error) {
       console.error('Erreur lors de la soumission:', error);
       setErrors({ submit: 'Une erreur est survenue. Veuillez réessayer.' });
+      toast({
+        title: 'Envoi echoue',
+        description: 'Une erreur est survenue. Veuillez reessayer.',
+        variant: 'destructive',
+      });
     } finally {
       setIsSubmitting(false);
     }

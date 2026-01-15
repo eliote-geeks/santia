@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X } from 'lucide-react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
+import { toast } from '../hooks/use-toast';
 
 const starterMessages = [
   {
@@ -43,6 +44,10 @@ export const AssistantWidget = () => {
     if (!trimmed) return;
     pushMessage(trimmed, 'patient');
     setChatInput('');
+    toast({
+      title: 'Message envoye',
+      description: 'Santy prepare votre reponse.',
+    });
     setTimeout(() => {
       pushMessage('Merci, je prepare cela. Souhaitez-vous ajouter des details ?', 'assistant');
     }, 500);
@@ -50,6 +55,10 @@ export const AssistantWidget = () => {
 
   const handleQuickAction = (message) => {
     pushMessage(message, 'patient');
+    toast({
+      title: 'Message envoye',
+      description: 'Votre demande est transmise.',
+    });
     setTimeout(() => {
       pushMessage("Parfait, je m'en occupe. Pouvez-vous preciser votre disponibilite ?", 'assistant');
     }, 400);

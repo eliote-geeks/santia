@@ -9,6 +9,7 @@ import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { Messagerie } from "./pages/Messagerie";
 import { AssistantWidget } from "./components/AssistantWidget";
+import { Toaster } from "./components/ui/toaster";
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
           <Route path="/admin" element={<Admin />} />
         </Routes>
         <AssistantWidget />
+        <Toaster />
       </BrowserRouter>
     </div>
   );

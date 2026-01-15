@@ -7,6 +7,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { setAuth, setOpenIM } from '../lib/auth';
+import { toast } from '../hooks/use-toast';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -32,10 +33,19 @@ export const Login = () => {
       const response = await axios.post(`${API_URL}/api/auth/login`, formData);
       setAuth(response.data.access_token, response.data.user);
       setOpenIM(response.data.openim);
+      toast({
+        title: 'Connexion reussie',
+        description: 'Bienvenue sur Santia.',
+      });
       const fallback = response.data.user?.role === 'admin' ? '/admin' : '/dossier';
       navigate(nextPath || fallback, { state: { welcome: 'login' } });
     } catch (err) {
       setError('Identifiants invalides.');
+      toast({
+        title: 'Connexion echouee',
+        description: 'Identifiants invalides.',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
