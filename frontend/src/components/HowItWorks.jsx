@@ -4,7 +4,7 @@ const steps = [
   {
     number: '01',
     title: 'Choisissez votre pathologie',
-    description: 'Perte de poids, sexo, addictions… sélectionnez votre besoin.',
+    description: 'Perte de poids, sante sexuelle, addictions… selectionnez votre besoin.',
     icon: ClipboardList
   },
   {

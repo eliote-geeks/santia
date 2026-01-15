@@ -26,9 +26,8 @@ const categoryLabels = {
   'sante-sexuelle': 'Sante sexuelle',
   addictions: 'Addictions',
   'perte-de-poids': 'Perte de poids',
-  sommeil: 'Sommeil',
-  cheveux: 'Cheveux',
-  fertilite: 'Fertilite'
+  sommeil: 'Sommeil & stress',
+  cheveux: 'Cheveux & peau'
 };
 
 const doctorCategories = [
@@ -36,8 +35,8 @@ const doctorCategories = [
   { value: 'perte-de-poids', label: 'Perte de poids' },
   { value: 'sante-sexuelle', label: 'Sante sexuelle' },
   { value: 'addictions', label: 'Addictions' },
-  { value: 'sommeil', label: 'Sommeil' },
-  { value: 'cheveux', label: 'Cheveux' }
+  { value: 'sommeil', label: 'Sommeil & stress' },
+  { value: 'cheveux', label: 'Cheveux & peau' }
 ];
 
 const formatDateTime = (value) => {

@@ -30,9 +30,8 @@ const categoryLabels = {
   generale: 'Generale',
   addictions: 'Addictions',
   'perte-de-poids': 'Perte de poids',
-  sommeil: 'Sommeil',
-  cheveux: 'Cheveux',
-  fertilite: 'Fertilite'
+  sommeil: 'Sommeil & stress',
+  cheveux: 'Cheveux & peau'
 };
 
 const durationLabels = {

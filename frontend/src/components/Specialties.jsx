@@ -5,7 +5,7 @@ const specialties = [
   {
     id: 'generale',
     title: 'Générale',
-    description: 'Consultation générale, bilan de santé...',
+    description: 'Consultation générale, symptômes courants, orientation...',
     icon: Stethoscope,
     color: 'bg-blue-50',
     iconColor: 'text-blue-600'
@@ -13,7 +13,7 @@ const specialties = [
   {
     id: 'perte-de-poids',
     title: 'Perte de poids',
-    description: 'Nutrition, régimes, suivi médical...',
+    description: 'Nutrition, suivi du poids, objectifs minceur...',
     icon: Scale,
     color: 'bg-emerald-50',
     iconColor: 'text-emerald-600'
@@ -21,7 +21,7 @@ const specialties = [
   {
     id: 'sante-sexuelle',
     title: 'Santé sexuelle',
-    description: 'Troubles érectiles, IST, contraception...',
+    description: 'Performance, libido, IST, contraception...',
     icon: Heart,
     color: 'bg-rose-50',
     iconColor: 'text-rose-500'
@@ -29,23 +29,23 @@ const specialties = [
   {
     id: 'addictions',
     title: 'Addictions',
-    description: 'Tabac, alcool, dépendances...',
+    description: 'Alcool, tabac, cannabis, dépendances...',
     icon: ShieldAlert,
     color: 'bg-amber-50',
     iconColor: 'text-amber-600'
   },
   {
     id: 'sommeil',
-    title: 'Sommeil',
-    description: 'Insomnie, apnée, troubles du sommeil...',
+    title: 'Sommeil & stress',
+    description: 'Insomnie, stress, fatigue, anxiété...',
     icon: Moon,
     color: 'bg-indigo-50',
     iconColor: 'text-indigo-600'
   },
   {
     id: 'cheveux',
-    title: 'Cheveux',
-    description: 'Chute de cheveux, alopécie, traitements...',
+    title: 'Cheveux & peau',
+    description: 'Chute de cheveux, acné, dermatologie...',
     icon: Sparkles,
     color: 'bg-purple-50',
     iconColor: 'text-purple-600'
@@ -61,7 +61,7 @@ export const Specialties = () => {
             Choisissez votre pathologie
           </h2>
           <p className="text-lg text-[#64748B] max-w-2xl mx-auto animate-fade-in-up stagger-1" data-testid="specialties-subtitle">
-            Consultation generale, perte de poids, sante sexuelle, addictions... Selectionnez la categorie qui vous concerne.
+            Generale, perte de poids, sante sexuelle, addictions, sommeil & stress, cheveux & peau... Selectionnez la categorie qui vous concerne.
           </p>
         </div>
 

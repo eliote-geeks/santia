@@ -77,7 +77,12 @@ export const Footer = () => {
               </li>
               <li>
                 <Link to="/consultation?category=sommeil" className="text-white/70 hover:text-[#2ECC71] transition-colors duration-200">
-                  Sommeil
+                  Sommeil & stress
+                </Link>
+              </li>
+              <li>
+                <Link to="/consultation?category=cheveux" className="text-white/70 hover:text-[#2ECC71] transition-colors duration-200">
+                  Cheveux & peau
                 </Link>
               </li>
             </ul>

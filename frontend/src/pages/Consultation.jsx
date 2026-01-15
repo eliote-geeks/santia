@@ -51,8 +51,8 @@ const categories = [
   { id: 'perte-de-poids', title: 'Perte de poids', icon: Scale, color: 'bg-emerald-50', iconColor: 'text-emerald-600' },
   { id: 'sante-sexuelle', title: 'Santé sexuelle', icon: Heart, color: 'bg-rose-50', iconColor: 'text-rose-500' },
   { id: 'addictions', title: 'Addictions', icon: ShieldAlert, color: 'bg-amber-50', iconColor: 'text-amber-600' },
-  { id: 'sommeil', title: 'Sommeil', icon: Moon, color: 'bg-indigo-50', iconColor: 'text-indigo-600' },
-  { id: 'cheveux', title: 'Cheveux', icon: Sparkles, color: 'bg-purple-50', iconColor: 'text-purple-600' }
+  { id: 'sommeil', title: 'Sommeil & stress', icon: Moon, color: 'bg-indigo-50', iconColor: 'text-indigo-600' },
+  { id: 'cheveux', title: 'Cheveux & peau', icon: Sparkles, color: 'bg-purple-50', iconColor: 'text-purple-600' }
 ];
 
 const durations = [
@@ -133,6 +133,9 @@ export const Consultation = () => {
   const [doctorsError, setDoctorsError] = useState('');
 
   const scheduleSlots = useMemo(() => buildScheduleSlots(), []);
+  const featuredDoctor = availableDoctors[0];
+  const secondaryDoctors = availableDoctors.slice(1, 3);
+  const extraDoctorCount = Math.max(availableDoctors.length - 3, 0);
 
   const [formData, setFormData] = useState({
     category: searchParams.get('category') || '',
@@ -454,10 +457,17 @@ export const Consultation = () => {
 
                 {formData.category && (
                   <div className="mt-8 bg-[#F8FAFC] border border-slate-200 rounded-2xl p-5">
-                    <h3 className="text-sm font-semibold text-[#0A2540] mb-2">Medecins disponibles</h3>
-                    <p className="text-xs text-[#64748B] mb-4">
-                      Un medecin sera automatiquement propose selon votre pathologie.
-                    </p>
+                    <div className="flex items-start justify-between gap-3 mb-4">
+                      <div>
+                        <h3 className="text-sm font-semibold text-[#0A2540]">Medecins disponibles</h3>
+                        <p className="text-xs text-[#64748B]">
+                          Un medecin sera automatiquement propose selon votre pathologie.
+                        </p>
+                      </div>
+                      <span className="text-[11px] px-2 py-1 rounded-full bg-white border border-slate-200 text-[#64748B]">
+                        {availableDoctors.length} medecins
+                      </span>
+                    </div>
                     {doctorsLoading ? (
                       <div className="flex items-center gap-2 text-xs text-[#64748B]">
                         <Loader2 className="w-4 h-4 animate-spin text-[#2ECC71]" />
@@ -468,21 +478,35 @@ export const Consultation = () => {
                     ) : availableDoctors.length === 0 ? (
                       <div className="text-xs text-[#64748B]">Aucun medecin disponible pour le moment.</div>
                     ) : (
-                      <div className="grid sm:grid-cols-2 gap-3">
-                        {availableDoctors.slice(0, 4).map((doctor, index) => (
-                          <div
-                            key={doctor.id}
-                            className={`border rounded-xl p-3 ${
-                              index === 0 ? 'border-[#2ECC71] bg-white' : 'border-slate-200 bg-white'
-                            }`}
-                          >
-                            <p className="text-sm font-semibold text-[#0A2540]">Dr {doctor.name}</p>
-                            <p className="text-xs text-[#64748B]">{doctor.specialty}</p>
-                            {index === 0 && (
-                              <p className="text-[11px] text-[#2ECC71] font-medium mt-1">Medecin recommande</p>
-                            )}
+                      <div className="space-y-4">
+                        {featuredDoctor && (
+                          <div className="border border-[#2ECC71]/60 bg-white rounded-xl p-4">
+                            <div className="flex items-start justify-between gap-4">
+                              <div>
+                                <p className="text-sm font-semibold text-[#0A2540]">Dr {featuredDoctor.name}</p>
+                                <p className="text-xs text-[#64748B]">{featuredDoctor.specialty}</p>
+                              </div>
+                              <span className="text-[11px] font-semibold text-[#2ECC71] bg-[#2ECC71]/10 px-2 py-1 rounded-full">
+                                Medecin recommande
+                              </span>
+                            </div>
                           </div>
-                        ))}
+                        )}
+                        {secondaryDoctors.length > 0 && (
+                          <div className="grid sm:grid-cols-2 gap-3">
+                            {secondaryDoctors.map((doctor) => (
+                              <div key={doctor.id} className="border border-slate-200 bg-white rounded-xl p-3">
+                                <p className="text-sm font-semibold text-[#0A2540]">Dr {doctor.name}</p>
+                                <p className="text-xs text-[#64748B]">{doctor.specialty}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {extraDoctorCount > 0 && (
+                          <div className="text-[11px] text-[#64748B]">
+                            + {extraDoctorCount} autres medecins disponibles pour cette specialite.
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

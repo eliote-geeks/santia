@@ -88,9 +88,8 @@ def category_label(category_id: str) -> str:
         "generale": "Generale",
         "addictions": "Addictions",
         "perte-de-poids": "Perte de poids",
-        "sommeil": "Sommeil",
-        "cheveux": "Cheveux",
-        "fertilite": "Fertilite",
+        "sommeil": "Sommeil & stress",
+        "cheveux": "Cheveux & peau",
     }
     return mapping.get(category_id, category_id)
 
@@ -962,55 +961,158 @@ async def create_doctor(input: DoctorCreate, _: dict = Depends(require_admin)):
         raise HTTPException(status_code=400, detail="Email deja utilise")
     return await create_doctor_record(input)
 
+def default_doctor_samples_by_category() -> dict:
+    return {
+        "generale": [
+            DoctorCreate(
+                name="Armand Tchokote",
+                email="armand.tchokote@santia.care",
+                phone="+237 6 75 44 33 22",
+                specialty="Medecine generale",
+                category="generale",
+            ),
+            DoctorCreate(
+                name="Mireille Ndi",
+                email="mireille.ndi@santia.care",
+                phone="+237 6 56 12 34 45",
+                specialty="Medecine generale",
+                category="generale",
+            ),
+            DoctorCreate(
+                name="Patrick Nkoulou",
+                email="patrick.nkoulou@santia.care",
+                phone="+237 6 62 45 78 90",
+                specialty="Medecine generale",
+                category="generale",
+            ),
+        ],
+        "perte-de-poids": [
+            DoctorCreate(
+                name="Sandrine Mbida",
+                email="sandrine.mbida@santia.care",
+                phone="+237 6 70 11 22 33",
+                specialty="Nutrition et perte de poids",
+                category="perte-de-poids",
+            ),
+            DoctorCreate(
+                name="Clarisse Ndi",
+                email="clarisse.ndi@santia.care",
+                phone="+237 6 79 14 28 36",
+                specialty="Nutrition clinique",
+                category="perte-de-poids",
+            ),
+            DoctorCreate(
+                name="Josephine Mbarga",
+                email="josephine.mbarga@santia.care",
+                phone="+237 6 88 41 77 09",
+                specialty="Metabolisme et controle du poids",
+                category="perte-de-poids",
+            ),
+        ],
+        "sante-sexuelle": [
+            DoctorCreate(
+                name="Prisca Fotsing",
+                email="prisca.fotsing@santia.care",
+                phone="+237 6 88 32 10 98",
+                specialty="Sante sexuelle",
+                category="sante-sexuelle",
+            ),
+            DoctorCreate(
+                name="Nadia Mballa",
+                email="nadia.mballa@santia.care",
+                phone="+237 6 93 22 15 47",
+                specialty="Sante sexuelle et IST",
+                category="sante-sexuelle",
+            ),
+            DoctorCreate(
+                name="Yannick Ndi",
+                email="yannick.ndi@santia.care",
+                phone="+237 6 54 90 11 66",
+                specialty="Sante reproductive",
+                category="sante-sexuelle",
+            ),
+        ],
+        "addictions": [
+            DoctorCreate(
+                name="Alain Njoya",
+                email="alain.njoya@santia.care",
+                phone="+237 6 91 23 45 67",
+                specialty="Addictologie",
+                category="addictions",
+            ),
+            DoctorCreate(
+                name="Samuel Fotso",
+                email="samuel.fotso@santia.care",
+                phone="+237 6 52 60 11 24",
+                specialty="Sevrage et accompagnement",
+                category="addictions",
+            ),
+            DoctorCreate(
+                name="Carine Meka",
+                email="carine.meka@santia.care",
+                phone="+237 6 84 31 09 58",
+                specialty="Tabac, alcool, dependances",
+                category="addictions",
+            ),
+        ],
+        "sommeil": [
+            DoctorCreate(
+                name="Aline Kengne",
+                email="aline.kengne@santia.care",
+                phone="+237 6 50 98 76 54",
+                specialty="Sommeil et stress",
+                category="sommeil",
+            ),
+            DoctorCreate(
+                name="Judith Ebana",
+                email="judith.ebana@santia.care",
+                phone="+237 6 78 30 14 22",
+                specialty="Anxiete et fatigue chronique",
+                category="sommeil",
+            ),
+            DoctorCreate(
+                name="Olivier Ndi",
+                email="olivier.ndi@santia.care",
+                phone="+237 6 69 42 18 07",
+                specialty="Troubles du sommeil",
+                category="sommeil",
+            ),
+        ],
+        "cheveux": [
+            DoctorCreate(
+                name="Serge Mbarga",
+                email="serge.mbarga@santia.care",
+                phone="+237 6 96 55 44 11",
+                specialty="Dermatologie, peau et cheveux",
+                category="cheveux",
+            ),
+            DoctorCreate(
+                name="Odile Essomba",
+                email="odile.essomba@santia.care",
+                phone="+237 6 83 27 56 44",
+                specialty="Dermatologie clinique",
+                category="cheveux",
+            ),
+            DoctorCreate(
+                name="Loic Fomba",
+                email="loic.fomba@santia.care",
+                phone="+237 6 72 19 88 33",
+                specialty="Chute de cheveux et cuir chevelu",
+                category="cheveux",
+            ),
+        ],
+    }
+
+def default_doctor_samples() -> List[DoctorCreate]:
+    samples_by_category = default_doctor_samples_by_category()
+    return [sample for group in samples_by_category.values() for sample in group]
+
 @api_router.post("/doctors/seed", response_model=DoctorSeedResponse)
 async def seed_doctors(_: dict = Depends(require_admin)):
     if db is None:
         raise HTTPException(status_code=503, detail="Base de donnees indisponible")
 
-    samples = [
-        DoctorCreate(
-            name="Sandrine Mbida",
-            email="sandrine.mbida@santia.care",
-            phone="+237 6 70 11 22 33",
-            specialty="Nutrition et perte de poids",
-            category="perte-de-poids",
-        ),
-        DoctorCreate(
-            name="Alain Njoya",
-            email="alain.njoya@santia.care",
-            phone="+237 6 91 23 45 67",
-            specialty="Addictologie",
-            category="addictions",
-        ),
-        DoctorCreate(
-            name="Prisca Fotsing",
-            email="prisca.fotsing@santia.care",
-            phone="+237 6 88 32 10 98",
-            specialty="Sante sexuelle",
-            category="sante-sexuelle",
-        ),
-        DoctorCreate(
-            name="Armand Tchokote",
-            email="armand.tchokote@santia.care",
-            phone="+237 6 75 44 33 22",
-            specialty="Medecine generale",
-            category="generale",
-        ),
-        DoctorCreate(
-            name="Aline Kengne",
-            email="aline.kengne@santia.care",
-            phone="+237 6 50 98 76 54",
-            specialty="Sommeil et stress",
-            category="sommeil",
-        ),
-        DoctorCreate(
-            name="Serge Mbarga",
-            email="serge.mbarga@santia.care",
-            phone="+237 6 96 55 44 11",
-            specialty="Dermatologie et cheveux",
-            category="cheveux",
-        ),
-    ]
+    samples = default_doctor_samples()
 
     created = []
     skipped = []
@@ -1294,3 +1396,28 @@ async def ensure_admin_user():
         "openim_user_id": None,
     }
     await db.users.insert_one(user_doc)
+
+@app.on_event("startup")
+async def ensure_default_doctors():
+    if db is None:
+        return
+    samples_by_category = default_doctor_samples_by_category()
+    for category, samples in samples_by_category.items():
+        if category == "generale":
+            query = {"$or": [{"category": "generale"}, {"category": {"$exists": False}}]}
+        else:
+            query = {"category": category}
+        count = await db.doctors.count_documents(query)
+        if count >= 3:
+            continue
+        for sample in samples:
+            if count >= 3:
+                break
+            existing = await db.doctors.find_one({"email": sample.email.lower()}, {"_id": 1})
+            if existing:
+                continue
+            try:
+                await create_doctor_record(sample)
+                count += 1
+            except Exception as exc:
+                logger.warning("Default doctor seed failed for %s: %s", sample.email, exc)
