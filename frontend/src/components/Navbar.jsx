@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, Phone } from 'lucide-react';
+import { ArrowLeft, Menu, X, Phone } from 'lucide-react';
 import { clearAuth, getToken, getUser } from '../lib/auth';
 
 export const Navbar = () => {
@@ -10,6 +10,7 @@ export const Navbar = () => {
   const isAuthed = !!getToken();
   const user = getUser();
   const isAdmin = user?.role === 'admin';
+  const showBack = location.pathname !== '/';
 
   const isActive = (path) => location.pathname === path;
   const handleLogout = () => {
@@ -17,21 +18,42 @@ export const Navbar = () => {
     setIsOpen(false);
     navigate('/');
   };
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/');
+    }
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 glass-header border-b border-slate-100" data-testid="navbar">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
-          <Link to="/" className="flex items-center" data-testid="navbar-logo">
-            <div className="bg-[#0A2540] rounded-2xl h-16 w-24 flex items-center justify-center">
-              <img
-                src="/images/logo_rm_transparent.png"
-                alt="Santia Logo"
-                className="h-12 md:h-14 w-auto"
-              />
-            </div>
-          </Link>
+          <div className="flex items-center gap-3" data-testid="navbar-brand">
+            {showBack && (
+              <button
+                type="button"
+                onClick={handleBack}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 text-[#0A2540] hover:border-[#2ECC71] hover:text-[#2ECC71] transition-colors duration-200"
+                aria-label="Retour"
+                data-testid="nav-back"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span className="hidden sm:inline text-sm font-medium">Retour</span>
+              </button>
+            )}
+            <Link to="/" className="flex items-center" data-testid="navbar-logo">
+              <div className="bg-[#0A2540] rounded-2xl h-16 w-24 flex items-center justify-center">
+                <img
+                  src="/images/logo_rm_transparent.png"
+                  alt="Santia Logo"
+                  className="h-12 md:h-14 w-auto"
+                />
+              </div>
+            </Link>
+          </div>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
