@@ -19,7 +19,7 @@ const trustItems = [
   {
     icon: Banknote,
     title: 'Prix abordable',
-    description: 'Consultations accessibles à partir de 5 000 FCFA.'
+    description: 'Consultations accessibles à partir de 3 000 FCFA.'
   },
   {
     icon: Shield,

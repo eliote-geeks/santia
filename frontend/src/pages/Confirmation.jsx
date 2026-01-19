@@ -26,7 +26,7 @@ export const Confirmation = () => {
   const scheduleLabel = booking?.schedule?.label || 'Aujourd\'hui 14:00';
   const meetingUrl = booking?.meetingUrl || DEFAULT_MEETING_URL;
   const paymentMethod = booking?.payment?.method || 'Orange Money';
-  const paymentAmount = booking?.payment?.amount || 10000;
+  const paymentAmount = booking?.payment?.amount || 3000;
   const paymentReference = booking?.payment?.reference || 'SM-000000';
   const patientName = booking?.name || 'Votre consultation';
 

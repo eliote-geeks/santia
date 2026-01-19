@@ -45,7 +45,7 @@ import { toast } from '../hooks/use-toast';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 const MEETING_BASE_URL = (process.env.REACT_APP_JITSI_URL || 'https://meet.jit.si').replace(/\/$/, '');
-const PAYMENT_AMOUNT = 10000;
+const PAYMENT_AMOUNT = 3000;
 const BOOKING_STORAGE_KEY = 'santia_booking';
 
 const categories = [

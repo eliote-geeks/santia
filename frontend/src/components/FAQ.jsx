@@ -17,7 +17,7 @@ const faqItems = [
   },
   {
     question: 'Combien coûte une consultation ?',
-    answer: 'Les consultations débutent à partir de 5 000 FCFA selon la spécialité. Le prix exact vous sera indiqué avant de confirmer votre demande.'
+    answer: 'Les consultations débutent à partir de 3 000 FCFA selon la spécialité. Le prix exact vous sera indiqué avant de confirmer votre demande.'
   },
   {
     question: 'Mes données sont-elles protégées ?',
