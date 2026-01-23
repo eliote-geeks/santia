@@ -150,7 +150,6 @@ export const Consultation = () => {
   const [doctorsError, setDoctorsError] = useState('');
 
   const scheduleSlots = useMemo(() => buildScheduleSlots(), []);
-  const selectedDoctor = availableDoctors.find((doctor) => doctor.id === formData.requestedDoctorId);
 
   const [formData, setFormData] = useState({
     category: searchParams.get('category') || '',
@@ -175,6 +174,11 @@ export const Consultation = () => {
     paymentReference: '',
     consent: false
   });
+
+  const selectedDoctor = useMemo(
+    () => availableDoctors.find((doctor) => doctor.id === formData.requestedDoctorId),
+    [availableDoctors, formData.requestedDoctorId]
+  );
 
   useEffect(() => {
     const categoryFromUrl = searchParams.get('category');
