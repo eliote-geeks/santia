@@ -1136,6 +1136,7 @@ async def create_intake(input: IntakeCreate, current_user: dict = Depends(get_cu
     
     intake_id = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
+    meeting_url = generate_meeting_url(intake_id)
 
     openemr_patient_id = None
     if openemr_client.is_configured():
@@ -1178,7 +1179,7 @@ async def create_intake(input: IntakeCreate, current_user: dict = Depends(get_cu
         "status": "pending",
         "created_at": created_at,
         "scheduled_at": None,
-        "meeting_url": None,
+        "meeting_url": meeting_url,
         "whatsapp_link": None,
         "user_id": current_user.get("id"),
         "requested_doctor_id": requested_doctor_id,

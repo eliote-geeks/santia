@@ -335,20 +335,21 @@ export const Consultation = () => {
       setErrors(prev => ({ ...prev, ...newErrors }));
       return;
     }
+    const reference = formData.paymentReference.trim();
     setFormData(prev => ({
       ...prev,
       paymentConfirmed: true,
-      paymentReference: prev.paymentReference.trim()
+      paymentReference: reference
     }));
     setErrors(prev => ({ ...prev, paymentConfirmed: null, paymentReference: null }));
     addNotification({
       title: 'Reference validee',
-      description: `Reference ${formData.paymentReference.trim()}`,
+      description: `Reference ${reference}`,
       type: 'payment',
     });
     toast({
       title: 'Reference validee',
-      description: `Reference ${formData.paymentReference.trim()}`,
+      description: `Reference ${reference}`,
     });
   };
 
@@ -398,14 +399,15 @@ export const Consultation = () => {
         requested_doctor_id: formData.requestedDoctorId || undefined
       };
 
-      await axios.post(`${API_URL}/api/intake`, payload, {
+      const response = await axios.post(`${API_URL}/api/intake`, payload, {
         headers: authHeaders()
       });
-
-      const meetingUrl = buildMeetingUrl();
+      const intakeData = response.data || {};
+      const meetingUrl = intakeData.meeting_url || buildMeetingUrl();
       const paymentLabel = paymentMethods.find((method) => method.id === formData.paymentMethod)?.label || formData.paymentMethod;
       const paymentPlanLabel = formData.paymentPlan === 'mensuel' ? 'Abonnement mensuel' : 'Consultation unique';
       const booking = {
+        intakeId: intakeData.id || null,
         name: formData.name,
         phone: formData.phone,
         email: formData.email,
