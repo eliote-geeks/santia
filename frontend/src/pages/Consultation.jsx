@@ -86,6 +86,21 @@ const paymentMethods = [
   }
 ];
 
+const paymentPlans = [
+  {
+    id: 'consultation',
+    title: 'Consultation unique',
+    description: 'Paiement de 3 000 FCFA pour une consultation.',
+    badge: 'Unique'
+  },
+  {
+    id: 'mensuel',
+    title: 'Abonnement mensuel',
+    description: 'Vous payez un forfait mensuel et indiquez la reference.',
+    badge: 'Mensuel'
+  }
+];
+
 const buildScheduleSlots = () => {
   const slots = [];
   const now = new Date();
@@ -135,9 +150,7 @@ export const Consultation = () => {
   const [doctorsError, setDoctorsError] = useState('');
 
   const scheduleSlots = useMemo(() => buildScheduleSlots(), []);
-  const featuredDoctor = availableDoctors[0];
-  const secondaryDoctors = availableDoctors.slice(1, 3);
-  const extraDoctorCount = Math.max(availableDoctors.length - 3, 0);
+  const selectedDoctor = availableDoctors.find((doctor) => doctor.id === formData.requestedDoctorId);
 
   const [formData, setFormData] = useState({
     category: searchParams.get('category') || '',
@@ -154,6 +167,8 @@ export const Consultation = () => {
     scheduleDate: '',
     scheduleTime: '',
     scheduleLabel: '',
+    requestedDoctorId: '',
+    paymentPlan: 'consultation',
     paymentMethod: '',
     paymentPhone: '',
     paymentConfirmed: false,
@@ -185,6 +200,7 @@ export const Consultation = () => {
     if (!formData.category) {
       setAvailableDoctors([]);
       setDoctorsError('');
+      setFormData(prev => ({ ...prev, requestedDoctorId: '' }));
       return;
     }
     const fetchDoctors = async () => {
@@ -195,7 +211,11 @@ export const Consultation = () => {
         const response = await axios.get(`${API_URL}/api/doctors/public`, {
           params: { category: formData.category }
         });
-        setAvailableDoctors(response.data || []);
+        const doctors = response.data || [];
+        setAvailableDoctors(doctors);
+        if (formData.requestedDoctorId && !doctors.find((doc) => doc.id === formData.requestedDoctorId)) {
+          setFormData(prev => ({ ...prev, requestedDoctorId: '' }));
+        }
       } catch (error) {
         setDoctorsError('Impossible de charger les medecins pour cette categorie.');
         setAvailableDoctors([]);
@@ -204,15 +224,15 @@ export const Consultation = () => {
       }
     };
     fetchDoctors();
-  }, [formData.category]);
+  }, [formData.category, formData.requestedDoctorId]);
 
   const updateFormData = (field, value) => {
     setFormData(prev => {
       const next = { ...prev, [field]: value };
-      if (['paymentMethod', 'paymentPhone'].includes(field)) {
-        next.paymentConfirmed = false;
-        next.paymentReference = '';
-      }
+    if (['paymentMethod', 'paymentPhone', 'paymentPlan'].includes(field)) {
+      next.paymentConfirmed = false;
+      next.paymentReference = '';
+    }
       return next;
     });
     if (errors[field]) {
@@ -253,7 +273,14 @@ export const Consultation = () => {
     } else if (step === 5) {
       if (!formData.paymentMethod) newErrors.paymentMethod = 'Choisissez un moyen de paiement';
       if (!formData.paymentPhone.trim()) newErrors.paymentPhone = 'Indiquez le numéro Mobile Money';
-      if (!formData.paymentConfirmed) newErrors.paymentConfirmed = 'Confirmez le paiement Mobile Money';
+      if (formData.paymentPlan === 'mensuel' && !formData.paymentReference.trim()) {
+        newErrors.paymentReference = 'Indiquez la reference de paiement';
+      }
+      if (!formData.paymentConfirmed) {
+        newErrors.paymentConfirmed = formData.paymentPlan === 'mensuel'
+          ? 'Validez la reference de paiement'
+          : 'Confirmez le paiement Mobile Money';
+      }
       if (!formData.consent) newErrors.consent = 'Vous devez accepter les conditions';
     }
 
@@ -299,10 +326,40 @@ export const Consultation = () => {
     });
   };
 
+  const handleValidateReference = () => {
+    const newErrors = {};
+    if (!formData.paymentMethod) newErrors.paymentMethod = 'Choisissez un moyen de paiement';
+    if (!formData.paymentPhone.trim()) newErrors.paymentPhone = 'Indiquez le numéro Mobile Money';
+    if (!formData.paymentReference.trim()) newErrors.paymentReference = 'Indiquez la reference de paiement';
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(prev => ({ ...prev, ...newErrors }));
+      return;
+    }
+    setFormData(prev => ({
+      ...prev,
+      paymentConfirmed: true,
+      paymentReference: prev.paymentReference.trim()
+    }));
+    setErrors(prev => ({ ...prev, paymentConfirmed: null, paymentReference: null }));
+    addNotification({
+      title: 'Reference validee',
+      description: `Reference ${formData.paymentReference.trim()}`,
+      type: 'payment',
+    });
+    toast({
+      title: 'Reference validee',
+      description: `Reference ${formData.paymentReference.trim()}`,
+    });
+  };
+
   const requestPaymentConfirmation = () => {
     const newErrors = {};
     if (!formData.paymentMethod) newErrors.paymentMethod = 'Choisissez un moyen de paiement';
     if (!formData.paymentPhone.trim()) newErrors.paymentPhone = 'Indiquez le numéro Mobile Money';
+    if (formData.paymentPlan !== 'consultation') {
+      setErrors(prev => ({ ...prev, ...newErrors }));
+      return;
+    }
     if (Object.keys(newErrors).length > 0) {
       setErrors(prev => ({ ...prev, ...newErrors }));
       return;
@@ -337,7 +394,8 @@ export const Consultation = () => {
         phone: formData.phone,
         email: formData.email,
         city: formData.city,
-        consent: formData.consent
+        consent: formData.consent,
+        requested_doctor_id: formData.requestedDoctorId || undefined
       };
 
       await axios.post(`${API_URL}/api/intake`, payload, {
@@ -346,6 +404,7 @@ export const Consultation = () => {
 
       const meetingUrl = buildMeetingUrl();
       const paymentLabel = paymentMethods.find((method) => method.id === formData.paymentMethod)?.label || formData.paymentMethod;
+      const paymentPlanLabel = formData.paymentPlan === 'mensuel' ? 'Abonnement mensuel' : 'Consultation unique';
       const booking = {
         name: formData.name,
         phone: formData.phone,
@@ -358,8 +417,10 @@ export const Consultation = () => {
           label: formData.scheduleLabel
         },
         payment: {
+          plan: formData.paymentPlan,
+          planLabel: paymentPlanLabel,
           method: paymentLabel,
-          amount: PAYMENT_AMOUNT,
+          amount: formData.paymentPlan === 'mensuel' ? null : PAYMENT_AMOUNT,
           phone: formData.paymentPhone,
           reference: formData.paymentReference
         },
@@ -399,6 +460,17 @@ export const Consultation = () => {
   const getPaymentMethodLabel = (id) => {
     const method = paymentMethods.find((item) => item.id === id);
     return method ? method.label : '—';
+  };
+
+  const getPaymentPlanLabel = (id) => {
+    const plan = paymentPlans.find((item) => item.id === id);
+    return plan ? plan.title : '—';
+  };
+
+  const getPaymentAmountLabel = () => {
+    return formData.paymentPlan === 'mensuel'
+      ? 'Forfait mensuel'
+      : `${formatMoney(PAYMENT_AMOUNT)} FCFA`;
   };
 
   return (
@@ -486,12 +558,21 @@ export const Consultation = () => {
                       <div>
                         <h3 className="text-sm font-semibold text-[#0A2540]">Medecins disponibles</h3>
                         <p className="text-xs text-[#64748B]">
-                          Un medecin sera automatiquement propose selon votre pathologie.
+                          Choisissez un medecin (optionnel) ou laissez Santia proposer.
                         </p>
                       </div>
-                      <span className="text-[11px] px-2 py-1 rounded-full bg-white border border-slate-200 text-[#64748B]">
-                        {availableDoctors.length} medecins
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => updateFormData('requestedDoctorId', '')}
+                          className="text-[11px] px-2 py-1 rounded-full bg-white border border-slate-200 text-[#64748B] hover:text-[#0A2540] hover:border-[#2ECC71] transition-colors"
+                        >
+                          Laisser Santia choisir
+                        </button>
+                        <span className="text-[11px] px-2 py-1 rounded-full bg-white border border-slate-200 text-[#64748B]">
+                          {availableDoctors.length} medecins
+                        </span>
+                      </div>
                     </div>
                     {doctorsLoading ? (
                       <div className="flex items-center gap-2 text-xs text-[#64748B]">
@@ -504,32 +585,41 @@ export const Consultation = () => {
                       <div className="text-xs text-[#64748B]">Aucun medecin disponible pour le moment.</div>
                     ) : (
                       <div className="space-y-4">
-                        {featuredDoctor && (
-                          <div className="border border-[#2ECC71]/60 bg-white rounded-xl p-4">
-                            <div className="flex items-start justify-between gap-4">
-                              <div>
-                                <p className="text-sm font-semibold text-[#0A2540]">Dr {featuredDoctor.name}</p>
-                                <p className="text-xs text-[#64748B]">{featuredDoctor.specialty}</p>
+                        <div className="grid sm:grid-cols-2 gap-3">
+                          {availableDoctors.map((doctor, index) => (
+                            <div
+                              key={doctor.id}
+                              className={`border rounded-xl p-3 bg-white ${
+                                formData.requestedDoctorId === doctor.id
+                                  ? 'border-[#2ECC71] ring-1 ring-[#2ECC71]'
+                                  : 'border-slate-200'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <p className="text-sm font-semibold text-[#0A2540]">Dr {doctor.name}</p>
+                                  <p className="text-xs text-[#64748B]">{doctor.specialty}</p>
+                                  {index === 0 && (
+                                    <span className="inline-block mt-2 text-[11px] font-semibold text-[#2ECC71] bg-[#2ECC71]/10 px-2 py-1 rounded-full">
+                                      Medecin recommande
+                                    </span>
+                                  )}
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => updateFormData('requestedDoctorId', doctor.id)}
+                                >
+                                  {formData.requestedDoctorId === doctor.id ? 'Choisi' : 'Choisir'}
+                                </Button>
                               </div>
-                              <span className="text-[11px] font-semibold text-[#2ECC71] bg-[#2ECC71]/10 px-2 py-1 rounded-full">
-                                Medecin recommande
-                              </span>
                             </div>
-                          </div>
-                        )}
-                        {secondaryDoctors.length > 0 && (
-                          <div className="grid sm:grid-cols-2 gap-3">
-                            {secondaryDoctors.map((doctor) => (
-                              <div key={doctor.id} className="border border-slate-200 bg-white rounded-xl p-3">
-                                <p className="text-sm font-semibold text-[#0A2540]">Dr {doctor.name}</p>
-                                <p className="text-xs text-[#64748B]">{doctor.specialty}</p>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {extraDoctorCount > 0 && (
-                          <div className="text-[11px] text-[#64748B]">
-                            + {extraDoctorCount} autres medecins disponibles pour cette specialite.
+                          ))}
+                        </div>
+                        {selectedDoctor && (
+                          <div className="text-[11px] text-[#2ECC71] font-medium">
+                            Medecin choisi: Dr {selectedDoctor.name}
                           </div>
                         )}
                       </div>
@@ -746,12 +836,50 @@ export const Consultation = () => {
                 <p className="text-[#64748B] mb-6">Réglez votre consultation via Orange Money ou MTN MoMo.</p>
 
                 <div className="space-y-6">
+                  <div>
+                    <Label className="text-[#0A2540] font-medium mb-3 block">Type de paiement *</Label>
+                    <RadioGroup
+                      value={formData.paymentPlan}
+                      onValueChange={(value) => updateFormData('paymentPlan', value)}
+                      className="grid sm:grid-cols-2 gap-4"
+                      data-testid="payment-plan"
+                    >
+                      {paymentPlans.map((plan) => (
+                        <div key={plan.id} className="flex items-center">
+                          <RadioGroupItem value={plan.id} id={`plan-${plan.id}`} className="peer sr-only" />
+                          <Label
+                            htmlFor={`plan-${plan.id}`}
+                            className={`flex-1 p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 ${
+                              formData.paymentPlan === plan.id
+                                ? 'border-[#2ECC71] bg-[#2ECC71]/5'
+                                : 'border-slate-200 hover:border-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="font-semibold text-[#0A2540]">{plan.title}</p>
+                                <p className="text-xs text-[#64748B]">{plan.description}</p>
+                              </div>
+                              <span className="text-[11px] font-semibold text-[#0A2540] bg-white border border-slate-200 rounded-full px-2 py-1">
+                                {plan.badge}
+                              </span>
+                            </div>
+                          </Label>
+                        </div>
+                      ))}
+                    </RadioGroup>
+                  </div>
+
                   <div className="bg-white border border-slate-200 rounded-2xl p-5">
                     <h3 className="font-semibold text-[#0A2540] mb-3">Récapitulatif avant paiement</h3>
                     <p className="text-xs text-[#64748B] mb-4">
                       Vérifiez vos informations avant de confirmer le paiement.
                     </p>
                     <div className="grid gap-3 text-sm">
+                      <div className="flex justify-between gap-4">
+                        <span className="text-[#64748B]">Plan</span>
+                        <span className="font-medium text-[#0A2540] text-right">{getPaymentPlanLabel(formData.paymentPlan)}</span>
+                      </div>
                       <div className="flex justify-between gap-4">
                         <span className="text-[#64748B]">Motif</span>
                         <span className="font-medium text-[#0A2540]">{getCategoryLabel(formData.category)}</span>
@@ -778,15 +906,15 @@ export const Consultation = () => {
                       </div>
                       <div className="flex justify-between gap-4">
                         <span className="text-[#64748B]">Montant</span>
-                        <span className="font-semibold text-[#0A2540] text-right">{formatMoney(PAYMENT_AMOUNT)} FCFA</span>
+                        <span className="font-semibold text-[#0A2540] text-right">{getPaymentAmountLabel()}</span>
                       </div>
                     </div>
                   </div>
 
                   <div className="bg-[#F8FAFC] rounded-xl p-4 flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-[#64748B]">Montant de la consultation</p>
-                      <p className="text-2xl font-bold text-[#0A2540]">{formatMoney(PAYMENT_AMOUNT)} FCFA</p>
+                      <p className="text-sm text-[#64748B]">Montant a regler</p>
+                      <p className="text-2xl font-bold text-[#0A2540]">{getPaymentAmountLabel()}</p>
                     </div>
                     <div className="text-xs text-[#2ECC71] font-medium">Paiement sécurisé</div>
                   </div>
@@ -843,23 +971,52 @@ export const Consultation = () => {
                     {errors.paymentPhone && <p className="text-red-500 text-sm mt-1">{errors.paymentPhone}</p>}
                   </div>
 
-                  <div className="bg-[#0A2540]/5 border border-[#0A2540]/10 rounded-2xl p-5">
-                    <p className="text-sm text-[#0A2540] font-medium">Simulation de paiement</p>
-                    <p className="text-xs text-[#64748B] mt-2">
-                      Cliquez sur “Simuler le paiement” pour continuer (pas de débit réel).
-                    </p>
-                    <div className="mt-4 flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-                      <Button type="button" className="btn-primary" onClick={requestPaymentConfirmation}>
-                        Simuler le paiement
-                      </Button>
-                      {formData.paymentConfirmed && (
-                        <span className="text-sm text-[#2ECC71] font-medium">
-                          Paiement confirmé · Réf {formData.paymentReference}
-                        </span>
-                      )}
+                  {formData.paymentPlan === 'mensuel' ? (
+                    <div className="bg-[#0A2540]/5 border border-[#0A2540]/10 rounded-2xl p-5">
+                      <p className="text-sm text-[#0A2540] font-medium">Reference de paiement mensuel</p>
+                      <p className="text-xs text-[#64748B] mt-2">
+                        Saisissez la reference de votre paiement mensuel pour validation.
+                      </p>
+                      <div className="mt-4 space-y-3">
+                        <Input
+                          id="paymentReference"
+                          type="text"
+                          placeholder="REF-123456"
+                          value={formData.paymentReference}
+                          onChange={(e) => updateFormData('paymentReference', e.target.value)}
+                          className="input-santia"
+                        />
+                        <Button type="button" className="btn-primary" onClick={handleValidateReference}>
+                          Valider la reference
+                        </Button>
+                        {formData.paymentConfirmed && (
+                          <span className="text-sm text-[#2ECC71] font-medium">
+                            Reference validee · {formData.paymentReference}
+                          </span>
+                        )}
+                        {errors.paymentReference && <p className="text-red-500 text-sm">{errors.paymentReference}</p>}
+                        {errors.paymentConfirmed && <p className="text-red-500 text-sm">{errors.paymentConfirmed}</p>}
+                      </div>
                     </div>
-                    {errors.paymentConfirmed && <p className="text-red-500 text-sm mt-2">{errors.paymentConfirmed}</p>}
-                  </div>
+                  ) : (
+                    <div className="bg-[#0A2540]/5 border border-[#0A2540]/10 rounded-2xl p-5">
+                      <p className="text-sm text-[#0A2540] font-medium">Simulation de paiement</p>
+                      <p className="text-xs text-[#64748B] mt-2">
+                        Cliquez sur “Simuler le paiement” pour continuer (pas de débit réel).
+                      </p>
+                      <div className="mt-4 flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                        <Button type="button" className="btn-primary" onClick={requestPaymentConfirmation}>
+                          Simuler le paiement
+                        </Button>
+                        {formData.paymentConfirmed && (
+                          <span className="text-sm text-[#2ECC71] font-medium">
+                            Paiement confirmé · Réf {formData.paymentReference}
+                          </span>
+                        )}
+                      </div>
+                      {errors.paymentConfirmed && <p className="text-red-500 text-sm mt-2">{errors.paymentConfirmed}</p>}
+                    </div>
+                  )}
 
                   <div className="border-t border-slate-200 pt-6">
                     <div className="flex items-start gap-3">
@@ -893,9 +1050,10 @@ export const Consultation = () => {
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <div className="mt-4 space-y-2 text-sm text-[#0A2540]">
+                      <p><strong>Plan:</strong> {getPaymentPlanLabel(formData.paymentPlan)}</p>
                       <p><strong>Motif:</strong> {getCategoryLabel(formData.category)}</p>
                       <p><strong>Créneau:</strong> {formData.scheduleLabel || '—'}</p>
-                      <p><strong>Montant:</strong> {formatMoney(PAYMENT_AMOUNT)} FCFA</p>
+                      <p><strong>Montant:</strong> {getPaymentAmountLabel()}</p>
                       <p><strong>Opérateur:</strong> {getPaymentMethodLabel(formData.paymentMethod)}</p>
                       <p><strong>Numéro:</strong> {formData.paymentPhone || '—'}</p>
                     </div>

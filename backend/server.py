@@ -576,6 +576,7 @@ class IntakeCreate(BaseModel):
     email: EmailStr
     city: str
     consent: bool
+    requested_doctor_id: Optional[str] = None
 
 class DoctorCreate(BaseModel):
     name: str
@@ -652,6 +653,7 @@ class IntakeResponse(BaseModel):
     openim_intro_sent: Optional[bool] = None
     openemr_patient_id: Optional[str] = None
     openemr_appointment_id: Optional[str] = None
+    requested_doctor_id: Optional[str] = None
 
 class IntakeScheduleUpdate(BaseModel):
     scheduled_at: datetime
@@ -1144,8 +1146,18 @@ async def create_intake(input: IntakeCreate, current_user: dict = Depends(get_cu
             raise HTTPException(status_code=502, detail="Erreur lors de la creation du dossier patient")
 
     assigned_doctor = None
+    requested_doctor_id = (input.requested_doctor_id or "").strip() or None
     if db is not None:
-        assigned_doctor = await pick_doctor_for_category(input.category)
+        if requested_doctor_id:
+            requested_doctor = await db.doctors.find_one({"id": requested_doctor_id}, {"_id": 0})
+            if not requested_doctor:
+                raise HTTPException(status_code=400, detail="Medecin indisponible")
+            doctor_category = requested_doctor.get("category")
+            if doctor_category and doctor_category not in {"generale", input.category}:
+                raise HTTPException(status_code=400, detail="Medecin incompatible avec la pathologie")
+            assigned_doctor = requested_doctor
+        if assigned_doctor is None:
+            assigned_doctor = await pick_doctor_for_category(input.category)
     patient_openim_id = current_user.get("openim_user_id")
     doctor_openim_id = assigned_doctor.get("openim_user_id") if assigned_doctor else None
     doctor_summary = build_doctor_summary(assigned_doctor) if assigned_doctor else None
@@ -1169,6 +1181,7 @@ async def create_intake(input: IntakeCreate, current_user: dict = Depends(get_cu
         "meeting_url": None,
         "whatsapp_link": None,
         "user_id": current_user.get("id"),
+        "requested_doctor_id": requested_doctor_id,
         "assigned_doctor_id": assigned_doctor.get("id") if assigned_doctor else None,
         "assigned_doctor": doctor_summary,
         "openim_patient_id": patient_openim_id if patient_openim_id else None,

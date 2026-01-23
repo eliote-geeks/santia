@@ -64,7 +64,9 @@ export const PatientProfile = () => {
     : welcomeType === 'login'
       ? 'Bon retour. Votre espace patient est pret.'
       : '';
+  const isDetailView = Boolean(id);
   const [intake, setIntake] = useState(null);
+  const [intakes, setIntakes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
@@ -82,7 +84,7 @@ export const PatientProfile = () => {
         } else {
           const response = await axios.get(`${API_URL}/api/intakes/me`, { headers: authHeaders() });
           const items = response.data || [];
-          setIntake(items[0] || null);
+          setIntakes(items);
         }
       } catch (err) {
         if (err.response?.status === 401) {
@@ -111,7 +113,7 @@ export const PatientProfile = () => {
 
 
   const statusInfo = intake?.status ? (statusMeta[intake.status] || statusMeta.pending) : statusMeta.pending;
-  const meetingReady = intake?.status === 'scheduled' && intake?.meeting_url;
+  const meetingReady = Boolean(intake?.meeting_url);
   const categoryLabel = intake?.category ? (categoryLabels[intake.category] || intake.category) : '';
   const durationLabel = intake?.duration ? (durationLabels[intake.duration] || intake.duration) : '';
   const doctorName = intake?.assigned_doctor?.name ? `Dr ${intake.assigned_doctor.name}` : 'En attente';
@@ -139,6 +141,8 @@ export const PatientProfile = () => {
     }
   ]) : [];
 
+  const pageTitle = isDetailView ? 'Suivi de votre consultation' : 'Mes consultations';
+
   return (
     <div className="min-h-screen bg-[#F8FAFC]" data-testid="patient-profile-page">
       <Navbar />
@@ -148,7 +152,7 @@ export const PatientProfile = () => {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
             <div>
               <p className="text-sm text-[#64748B]">Dossier de suivi</p>
-              <h1 className="text-3xl md:text-4xl font-bold text-[#0A2540]">Suivi de votre consultation</h1>
+              <h1 className="text-3xl md:text-4xl font-bold text-[#0A2540]">{pageTitle}</h1>
               {id && <p className="text-sm text-[#64748B] mt-2">Reference: {id}</p>}
             </div>
             <Link to="/" className="text-sm text-[#0A2540] hover:text-[#2ECC71] transition-colors">
@@ -184,17 +188,70 @@ export const PatientProfile = () => {
             </div>
           )}
 
-          {!loading && !intake && !error && (
+          {!loading && !error && !isDetailView && (
+            intakes.length === 0 ? (
+              <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
+                <p className="text-[#0A2540] font-semibold mb-2">Aucune consultation trouvee</p>
+                <p className="text-sm text-[#64748B] mb-6">Soumettez une demande pour acceder a votre dossier.</p>
+                <Link to="/consultation">
+                  <Button className="btn-green px-6 py-3">Commencer une consultation</Button>
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {intakes.map((item) => {
+                  const status = statusMeta[item.status] || statusMeta.pending;
+                  const label = item.category ? (categoryLabels[item.category] || item.category) : '—';
+                  const hasMeeting = Boolean(item.meeting_url);
+                  return (
+                    <div key={item.id} className="bg-white rounded-2xl shadow-lg p-6 md:p-7">
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        <div>
+                          <p className="text-xs text-[#64748B]">Reference: {item.id}</p>
+                          <h3 className="text-lg font-semibold text-[#0A2540] mt-1">{label}</h3>
+                          <p className="text-sm text-[#64748B] mt-1">Cree le {formatDateTime(item.created_at)}</p>
+                          {item.scheduled_at && (
+                            <p className="text-sm text-[#64748B]">Planifie le {formatDateTime(item.scheduled_at)}</p>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className={`text-xs font-semibold px-3 py-1 rounded-full ${status.tone}`}>
+                            {status.label}
+                          </span>
+                          <Link to={`/dossier/${item.id}`}>
+                            <Button variant="outline" className="px-4 py-2">Voir details</Button>
+                          </Link>
+                        </div>
+                      </div>
+                      {hasMeeting && (
+                        <div className="mt-4 bg-[#F8FAFC] border border-slate-200 rounded-xl p-4">
+                          <p className="text-xs text-[#64748B] mb-2">Lien de consultation</p>
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <p className="text-xs text-[#0A2540] break-all">{item.meeting_url}</p>
+                            <a href={item.meeting_url} target="_blank" rel="noreferrer">
+                              <Button className="btn-green px-4 py-2">Rejoindre</Button>
+                            </a>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          )}
+
+          {!loading && !error && isDetailView && !intake && (
             <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
-              <p className="text-[#0A2540] font-semibold mb-2">Aucune demande trouvee</p>
-              <p className="text-sm text-[#64748B] mb-6">Soumettez une demande pour acceder a votre dossier.</p>
-              <Link to="/consultation">
-                <Button className="btn-green px-6 py-3">Commencer une consultation</Button>
+              <p className="text-[#0A2540] font-semibold mb-2">Dossier introuvable</p>
+              <p className="text-sm text-[#64748B] mb-6">Ce dossier n existe pas ou vous n y avez pas acces.</p>
+              <Link to="/dossier">
+                <Button variant="outline" className="px-6 py-3">Retour aux consultations</Button>
               </Link>
             </div>
           )}
 
-          {!loading && intake && (
+          {!loading && intake && isDetailView && (
             <div className="space-y-6">
               <div className="grid lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 bg-white rounded-2xl shadow-lg p-6 md:p-8">

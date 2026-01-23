@@ -26,7 +26,9 @@ export const Confirmation = () => {
   const scheduleLabel = booking?.schedule?.label || 'Aujourd\'hui 14:00';
   const meetingUrl = booking?.meetingUrl || DEFAULT_MEETING_URL;
   const paymentMethod = booking?.payment?.method || 'Orange Money';
-  const paymentAmount = booking?.payment?.amount || 3000;
+  const paymentPlan = booking?.payment?.plan || 'consultation';
+  const paymentPlanLabel = booking?.payment?.planLabel || (paymentPlan === 'mensuel' ? 'Abonnement mensuel' : 'Consultation unique');
+  const paymentAmount = paymentPlan === 'mensuel' ? null : (booking?.payment?.amount || 3000);
   const paymentReference = booking?.payment?.reference || 'SM-000000';
   const patientName = booking?.name || 'Votre consultation';
 
@@ -73,7 +75,8 @@ export const Confirmation = () => {
                   <Wallet className="w-5 h-5 text-[#2ECC71]" />
                 </div>
                 <h3 className="font-semibold text-[#0A2540] text-sm mb-1">Paiement</h3>
-                <p className="text-xs text-[#64748B]">{paymentMethod}</p>
+                <p className="text-xs text-[#64748B]">{paymentPlanLabel}</p>
+                <p className="text-[11px] text-[#94A3B8] mt-1">{paymentMethod}</p>
               </div>
 
               <div className="bg-[#F8FAFC] rounded-xl p-4">
@@ -110,7 +113,9 @@ export const Confirmation = () => {
                 {smsMessage}
               </div>
               <div className="mt-4 flex items-center justify-between text-xs text-[#64748B]">
-                <span>Montant payé : {formatMoney(paymentAmount)} FCFA</span>
+                <span>
+                  Montant payé : {paymentAmount ? `${formatMoney(paymentAmount)} FCFA` : 'Abonnement mensuel'}
+                </span>
                 <span>Réf : {paymentReference}</span>
               </div>
             </div>
