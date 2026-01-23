@@ -14,7 +14,8 @@ import {
   MapPin,
   AlertTriangle,
   Loader2,
-  FileText
+  FileText,
+  Wallet
 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -23,6 +24,18 @@ const statusMeta = {
   pending: { label: 'En attente', tone: 'bg-amber-100 text-amber-700' },
   scheduled: { label: 'Planifiee', tone: 'bg-emerald-100 text-emerald-700' },
   done: { label: 'Terminee', tone: 'bg-slate-200 text-slate-700' }
+};
+
+const paymentStatusLabel = {
+  pending: 'En attente',
+  confirmed: 'Confirme',
+  rejected: 'Refuse'
+};
+
+const paymentStatusTone = {
+  pending: 'bg-amber-100 text-amber-700',
+  confirmed: 'bg-emerald-100 text-emerald-700',
+  rejected: 'bg-rose-100 text-rose-700'
 };
 
 const categoryLabels = {
@@ -52,6 +65,13 @@ const formatDateTime = (value) => {
     hour: '2-digit',
     minute: '2-digit'
   });
+};
+
+const formatMoney = (value) => {
+  if (value === null || value === undefined || value === '') return '—';
+  const amount = Number(value);
+  if (Number.isNaN(amount)) return value;
+  return new Intl.NumberFormat('fr-FR').format(amount);
 };
 
 export const PatientProfile = () => {
@@ -117,6 +137,13 @@ export const PatientProfile = () => {
   const categoryLabel = intake?.category ? (categoryLabels[intake.category] || intake.category) : '';
   const durationLabel = intake?.duration ? (durationLabels[intake.duration] || intake.duration) : '';
   const doctorName = intake?.assigned_doctor?.name ? `Dr ${intake.assigned_doctor.name}` : 'En attente';
+  const paymentAmount = intake?.payment_amount !== null && intake?.payment_amount !== undefined
+    ? `${formatMoney(intake.payment_amount)} FCFA`
+    : '—';
+  const paymentMethod = intake?.payment_method || 'Mobile Money';
+  const paymentReference = intake?.payment_reference || '—';
+  const paymentStatus = paymentStatusLabel[intake?.payment_status] || paymentStatusLabel.pending;
+  const paymentTone = paymentStatusTone[intake?.payment_status] || paymentStatusTone.pending;
   const nextAction = intake?.status === 'scheduled'
     ? 'Votre consultation est planifiee. Connectez-vous 5 minutes avant l\'heure.'
     : 'Votre demande est en cours de traitement. Un medecin vous sera assigne rapidement.';
@@ -348,21 +375,51 @@ export const PatientProfile = () => {
                   </div>
                 </div>
 
-                {meetingReady && (
-                  <div className="flex flex-col sm:flex-row gap-3 mt-6">
-                    <a href={intake.meeting_url} target="_blank" rel="noreferrer">
-                      <Button className="btn-green px-6 py-3">Rejoindre la consultation</Button>
-                    </a>
-                    <Button variant="outline" onClick={handleCopy} className="px-6 py-3">
-                      {copied ? 'Lien copie' : 'Copier le lien'}
-                    </Button>
-                  </div>
-                )}
-              </div>
+              {meetingReady && (
+                <div className="flex flex-col sm:flex-row gap-3 mt-6">
+                  <a href={intake.meeting_url} target="_blank" rel="noreferrer">
+                    <Button className="btn-green px-6 py-3">Rejoindre la consultation</Button>
+                  </a>
+                  <Button variant="outline" onClick={handleCopy} className="px-6 py-3">
+                    {copied ? 'Lien copie' : 'Copier le lien'}
+                  </Button>
+                </div>
+              )}
+            </div>
 
-              {intake.assigned_doctor && (
-                <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
-                  <h2 className="text-xl font-bold text-[#0A2540] mb-4">Votre medecin</h2>
+            <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
+              <h2 className="text-xl font-bold text-[#0A2540] mb-4">Paiement</h2>
+              <div className="grid md:grid-cols-2 gap-4 text-sm">
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <p className="text-[#64748B]">Mode</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Wallet className="w-4 h-4 text-[#2ECC71]" />
+                    <p className="font-semibold text-[#0A2540]">{paymentMethod}</p>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <p className="text-[#64748B]">Montant</p>
+                  <p className="font-semibold text-[#0A2540]">{paymentAmount}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <p className="text-[#64748B]">Reference</p>
+                  <p className="font-semibold text-[#0A2540] break-all">{paymentReference}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <p className="text-[#64748B]">Statut</p>
+                  <span className={`inline-flex mt-2 text-[11px] font-semibold px-2 py-1 rounded-full ${paymentTone}`}>
+                    {paymentStatus}
+                  </span>
+                </div>
+              </div>
+              <p className="text-xs text-[#64748B] mt-4">
+                Votre paiement est valide apres verification par notre equipe.
+              </p>
+            </div>
+
+            {intake.assigned_doctor && (
+              <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
+                <h2 className="text-xl font-bold text-[#0A2540] mb-4">Votre medecin</h2>
                   <div className="grid md:grid-cols-2 gap-6 text-sm">
                     <div>
                       <p className="text-lg font-semibold text-[#0A2540]">Dr {intake.assigned_doctor.name}</p>

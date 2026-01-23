@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { Button } from '../components/ui/button';
-import { Calendar, Clock, ExternalLink, Loader2, MessageSquare, RefreshCw, UserPlus } from 'lucide-react';
+import { Calendar, Clock, ExternalLink, Loader2, MessageSquare, RefreshCw, UserPlus, Wallet } from 'lucide-react';
 import { authHeaders, getToken, getUser } from '../lib/auth';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -19,6 +19,18 @@ const statusLabel = {
   pending: 'En attente',
   scheduled: 'Planifiee',
   done: 'Terminee'
+};
+
+const paymentStatusLabel = {
+  pending: 'En attente',
+  confirmed: 'Confirme',
+  rejected: 'Refuse'
+};
+
+const paymentStatusTone = {
+  pending: 'bg-amber-100 text-amber-700',
+  confirmed: 'bg-emerald-100 text-emerald-700',
+  rejected: 'bg-rose-100 text-rose-700'
 };
 
 const categoryLabels = {
@@ -50,6 +62,13 @@ const formatDateTime = (value) => {
     hour: '2-digit',
     minute: '2-digit'
   });
+};
+
+const formatMoney = (value) => {
+  if (value === null || value === undefined || value === '') return '—';
+  const amount = Number(value);
+  if (Number.isNaN(amount)) return value;
+  return new Intl.NumberFormat('fr-FR').format(amount);
 };
 
 export const Admin = () => {
@@ -532,7 +551,16 @@ export const Admin = () => {
                 </div>
               )}
 
-              {intakes.map((intake) => (
+              {intakes.map((intake) => {
+                const amountLabel = intake.payment_amount !== null && intake.payment_amount !== undefined
+                  ? `${formatMoney(intake.payment_amount)} FCFA`
+                  : '—';
+                const paymentMethod = intake.payment_method || 'Mobile Money';
+                const paymentReference = intake.payment_reference || '—';
+                const paymentStatus = paymentStatusLabel[intake.payment_status] || paymentStatusLabel.pending;
+                const paymentTone = paymentStatusTone[intake.payment_status] || paymentStatusTone.pending;
+
+                return (
                 <div key={intake.id} className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                     <div>
@@ -564,6 +592,17 @@ export const Admin = () => {
                       <div className="flex items-center gap-2">
                         <Clock className="w-4 h-4 text-[#2ECC71]" />
                         <span>Demande recue le {formatDateTime(intake.created_at)}</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <Wallet className="w-4 h-4 text-[#2ECC71] mt-0.5" />
+                        <div>
+                          <p className="text-xs text-[#64748B]">Paiement</p>
+                          <p className="text-sm text-[#0A2540]">{paymentMethod} · {amountLabel}</p>
+                          <p className="text-xs text-[#64748B]">Ref: {paymentReference}</p>
+                          <span className={`inline-flex mt-1 text-[11px] font-semibold px-2 py-1 rounded-full ${paymentTone}`}>
+                            {paymentStatus}
+                          </span>
+                        </div>
                       </div>
                       {intake.meeting_url && (
                         <div className="flex items-center gap-2">
@@ -640,7 +679,8 @@ export const Admin = () => {
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

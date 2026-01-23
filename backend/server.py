@@ -576,6 +576,11 @@ class IntakeCreate(BaseModel):
     email: EmailStr
     city: str
     consent: bool
+    payment_method: Optional[str] = None
+    payment_phone: Optional[str] = None
+    payment_reference: Optional[str] = None
+    payment_amount: Optional[int] = None
+    payment_status: Optional[str] = None
     requested_doctor_id: Optional[str] = None
 
 class DoctorCreate(BaseModel):
@@ -654,6 +659,11 @@ class IntakeResponse(BaseModel):
     openemr_patient_id: Optional[str] = None
     openemr_appointment_id: Optional[str] = None
     requested_doctor_id: Optional[str] = None
+    payment_method: Optional[str] = None
+    payment_phone: Optional[str] = None
+    payment_reference: Optional[str] = None
+    payment_amount: Optional[int] = None
+    payment_status: Optional[str] = None
 
 class IntakeScheduleUpdate(BaseModel):
     scheduled_at: datetime
@@ -1176,6 +1186,11 @@ async def create_intake(input: IntakeCreate, current_user: dict = Depends(get_cu
         "email": input.email,
         "city": input.city,
         "consent": input.consent,
+        "payment_method": input.payment_method,
+        "payment_phone": input.payment_phone,
+        "payment_reference": input.payment_reference,
+        "payment_amount": input.payment_amount,
+        "payment_status": input.payment_status or "pending",
         "status": "pending",
         "created_at": created_at,
         "scheduled_at": None,

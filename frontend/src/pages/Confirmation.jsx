@@ -26,15 +26,13 @@ export const Confirmation = () => {
   const scheduleLabel = booking?.schedule?.label || 'Aujourd\'hui 14:00';
   const meetingUrl = booking?.meetingUrl || DEFAULT_MEETING_URL;
   const paymentMethod = booking?.payment?.method || 'Orange Money';
-  const paymentPlan = booking?.payment?.plan || 'consultation';
-  const paymentPlanLabel = booking?.payment?.planLabel || (paymentPlan === 'mensuel' ? 'Abonnement mensuel' : 'Consultation unique');
-  const paymentAmount = paymentPlan === 'mensuel' ? null : (booking?.payment?.amount || 3000);
-  const paymentReference = booking?.payment?.reference || 'SM-000000';
+  const paymentAmount = booking?.payment?.amount || 5000;
+  const paymentReference = booking?.payment?.reference || 'REF-000000';
   const patientName = booking?.name || 'Votre consultation';
 
   const smsMessage = useMemo(() => {
     const name = booking?.name || 'Patient';
-    return `Bonjour ${name}, votre consultation Santia est confirmée.\nCréneau: ${scheduleLabel}\nLien: ${meetingUrl}\nMerci.`;
+    return `Bonjour ${name}, votre paiement est en cours de validation.\nCréneau: ${scheduleLabel}\nLien: ${meetingUrl}\nMerci.`;
   }, [booking, scheduleLabel, meetingUrl]);
 
   return (
@@ -52,12 +50,12 @@ export const Confirmation = () => {
 
             {/* Title */}
             <h1 className="text-3xl md:text-4xl font-bold text-[#0A2540] mb-4 animate-fade-in-up stagger-2" data-testid="confirmation-title">
-              Paiement confirmé
+              Paiement en attente de validation
             </h1>
 
             {/* Subtitle */}
             <p className="text-lg text-[#64748B] mb-8 animate-fade-in-up stagger-3" data-testid="confirmation-subtitle">
-              Votre rendez-vous est validé. Un SMS vient d\'être envoyé avec le lien de consultation.
+              Votre reference de paiement a ete enregistree. Nous confirmons le depot avant le rendez-vous.
             </p>
 
             {/* Info Cards */}
@@ -75,8 +73,7 @@ export const Confirmation = () => {
                   <Wallet className="w-5 h-5 text-[#2ECC71]" />
                 </div>
                 <h3 className="font-semibold text-[#0A2540] text-sm mb-1">Paiement</h3>
-                <p className="text-xs text-[#64748B]">{paymentPlanLabel}</p>
-                <p className="text-[11px] text-[#94A3B8] mt-1">{paymentMethod}</p>
+                <p className="text-xs text-[#64748B]">{paymentMethod}</p>
               </div>
 
               <div className="bg-[#F8FAFC] rounded-xl p-4">
@@ -113,9 +110,7 @@ export const Confirmation = () => {
                 {smsMessage}
               </div>
               <div className="mt-4 flex items-center justify-between text-xs text-[#64748B]">
-                <span>
-                  Montant payé : {paymentAmount ? `${formatMoney(paymentAmount)} FCFA` : 'Abonnement mensuel'}
-                </span>
+                <span>Montant payé : {formatMoney(paymentAmount)} FCFA</span>
                 <span>Réf : {paymentReference}</span>
               </div>
             </div>
@@ -123,7 +118,7 @@ export const Confirmation = () => {
             {/* CTA Button */}
             <Link to="/" data-testid="back-to-home-button">
               <Button className="btn-primary inline-flex items-center gap-2">
-                Retour à l\'accueil
+                Retour à l'accueil
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>
