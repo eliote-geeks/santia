@@ -841,6 +841,14 @@ export const Consultation = () => {
                     {errors.paymentMethod && <p className="text-red-500 text-sm mt-1">{errors.paymentMethod}</p>}
                   </div>
 
+                  <div className="bg-white border border-slate-200 rounded-2xl p-4">
+                    <p className="text-sm font-semibold text-[#0A2540]">Depot Mobile Money</p>
+                    <p className="text-xs text-[#64748B] mt-2">
+                      Effectuez le depot sur le numero suivant puis indiquez la reference.
+                    </p>
+                    <p className="mt-3 text-lg font-bold text-[#0A2540] tracking-wide">657817198</p>
+                  </div>
+
                   <div>
                     <Label htmlFor="paymentPhone" className="text-[#0A2540] font-medium mb-2 block">Numéro Mobile Money *</Label>
                     <Input
