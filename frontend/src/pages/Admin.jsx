@@ -598,6 +598,7 @@ export const Admin = () => {
                 const paymentStatus = paymentStatusLabel[intake.payment_status] || paymentStatusLabel.pending;
                 const paymentTone = paymentStatusTone[intake.payment_status] || paymentStatusTone.pending;
                 const consultationType = intake.consultation_type === 'express' ? 'Express' : 'Standard';
+                const isExpress = intake.consultation_type === 'express';
                 const hasPaymentReference = Boolean(intake.payment_reference);
                 const isPaymentConfirmed = intake.payment_status === 'confirmed';
                 const isPaymentRejected = intake.payment_status === 'rejected';
@@ -607,11 +608,16 @@ export const Admin = () => {
                 <div key={intake.id} className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                     <div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex flex-wrap items-center gap-3">
                         <h2 className="text-lg font-semibold text-[#0A2540]">{intake.name}</h2>
                         <span className={`text-xs font-semibold px-3 py-1 rounded-full ${statusTone[intake.status] || statusTone.pending}`}>
                           {statusLabel[intake.status] || statusLabel.pending}
                         </span>
+                        {isExpress && (
+                          <span className="text-xs font-semibold px-3 py-1 rounded-full bg-rose-100 text-rose-700">
+                            Express
+                          </span>
+                        )}
                       </div>
                       <p className="text-sm text-[#64748B]">{categoryLabels[intake.category] || intake.category} • {intake.city}</p>
                       {intake.assigned_doctor && (

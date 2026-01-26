@@ -142,6 +142,7 @@ export const PatientProfile = () => {
     : '—';
   const paymentMethod = intake?.payment_method || 'Mobile Money';
   const paymentReference = intake?.payment_reference || '—';
+  const consultationType = intake?.consultation_type === 'express' ? 'Express' : 'Standard';
   const paymentStatus = paymentStatusLabel[intake?.payment_status] || paymentStatusLabel.pending;
   const paymentTone = paymentStatusTone[intake?.payment_status] || paymentStatusTone.pending;
   const nextAction = intake?.status === 'scheduled'
@@ -404,6 +405,10 @@ export const PatientProfile = () => {
                 <div className="rounded-xl border border-slate-200 p-4">
                   <p className="text-[#64748B]">Reference</p>
                   <p className="font-semibold text-[#0A2540] break-all">{paymentReference}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <p className="text-[#64748B]">Type de consultation</p>
+                  <p className="font-semibold text-[#0A2540]">{consultationType}</p>
                 </div>
                 <div className="rounded-xl border border-slate-200 p-4">
                   <p className="text-[#64748B]">Statut</p>
