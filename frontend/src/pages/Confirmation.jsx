@@ -7,6 +7,7 @@ import { Button } from '../components/ui/button';
 
 const BOOKING_STORAGE_KEY = 'santia_booking';
 const DEFAULT_MEETING_URL = 'https://meet.jit.si/santia-demo';
+const DEPOSIT_NUMBER = '657817198';
 
 const formatMoney = (amount) => new Intl.NumberFormat('fr-FR').format(amount);
 
@@ -32,7 +33,7 @@ export const Confirmation = () => {
 
   const smsMessage = useMemo(() => {
     const name = booking?.name || 'Patient';
-    return `Bonjour ${name}, votre paiement est en cours de validation.\nCréneau: ${scheduleLabel}\nLien: ${meetingUrl}\nMerci.`;
+    return `Bonjour ${name}, votre paiement est en cours de validation.\nDepot: ${DEPOSIT_NUMBER}\nCréneau: ${scheduleLabel}\nLien: ${meetingUrl}\nMerci.`;
   }, [booking, scheduleLabel, meetingUrl]);
 
   return (
@@ -74,6 +75,7 @@ export const Confirmation = () => {
                 </div>
                 <h3 className="font-semibold text-[#0A2540] text-sm mb-1">Paiement</h3>
                 <p className="text-xs text-[#64748B]">{paymentMethod}</p>
+                <p className="text-[11px] text-[#94A3B8] mt-1">Depot: {DEPOSIT_NUMBER}</p>
               </div>
 
               <div className="bg-[#F8FAFC] rounded-xl p-4">

@@ -37,6 +37,7 @@ const API_URL = process.env.REACT_APP_BACKEND_URL;
 const MEETING_BASE_URL = (process.env.REACT_APP_JITSI_URL || 'https://meet.jit.si').replace(/\/$/, '');
 const STANDARD_PAYMENT_AMOUNT = 5000;
 const EXPRESS_PAYMENT_AMOUNT = 8000;
+const DEPOSIT_NUMBER = '657817198';
 const BOOKING_STORAGE_KEY = 'santia_booking';
 
 const categories = [
@@ -124,6 +125,7 @@ export const Consultation = () => {
   const [availableDoctors, setAvailableDoctors] = useState([]);
   const [doctorsLoading, setDoctorsLoading] = useState(false);
   const [doctorsError, setDoctorsError] = useState('');
+  const [depositCopied, setDepositCopied] = useState(false);
 
   const scheduleSlots = useMemo(() => buildScheduleSlots(), []);
 
@@ -215,6 +217,24 @@ export const Consultation = () => {
     });
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: null }));
+    }
+  };
+
+  const handleCopyDeposit = async () => {
+    try {
+      await navigator.clipboard.writeText(DEPOSIT_NUMBER);
+      setDepositCopied(true);
+      toast({
+        title: 'Numero copie',
+        description: `Le numero ${DEPOSIT_NUMBER} a ete copie.`,
+      });
+      setTimeout(() => setDepositCopied(false), 2000);
+    } catch (error) {
+      toast({
+        title: 'Copie impossible',
+        description: 'Veuillez copier le numero manuellement.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -846,7 +866,17 @@ export const Consultation = () => {
                     <p className="text-xs text-[#64748B] mt-2">
                       Effectuez le depot sur le numero suivant puis indiquez la reference.
                     </p>
-                    <p className="mt-3 text-lg font-bold text-[#0A2540] tracking-wide">657817198</p>
+                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                      <p className="text-lg font-bold text-[#0A2540] tracking-wide">{DEPOSIT_NUMBER}</p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCopyDeposit}
+                      >
+                        {depositCopied ? 'Copie' : 'Copier le numero'}
+                      </Button>
+                    </div>
                   </div>
 
                   <div>
