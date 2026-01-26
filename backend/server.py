@@ -6,7 +6,7 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
-from typing import List, Optional
+from typing import List, Optional, Literal
 import uuid
 import hashlib
 import secrets
@@ -120,6 +120,21 @@ def generate_meeting_url(intake_id: str) -> str:
     slug = intake_id.split("-")[0]
     room = f"{prefix}-{slug}-{uuid.uuid4().hex[:6]}"
     return f"{jitsi_base_url()}/{room}"
+
+async def ensure_meeting_url(intake: Optional[dict]) -> Optional[dict]:
+    if not intake:
+        return intake
+    if intake.get("meeting_url"):
+        return intake
+    intake_id = intake.get("id") or str(uuid.uuid4())
+    meeting_url = generate_meeting_url(intake_id)
+    intake["meeting_url"] = meeting_url
+    if db is not None and intake.get("id"):
+        await db.intakes.update_one(
+            {"id": intake["id"]},
+            {"$set": {"meeting_url": meeting_url}},
+        )
+    return intake
 
 def build_whatsapp_link(intake: dict, scheduled_at: datetime, meeting_url: str) -> Optional[str]:
     phone = normalize_phone(intake.get("phone", ""))
@@ -671,6 +686,9 @@ class IntakeScheduleUpdate(BaseModel):
 
 class IntakeAssignDoctor(BaseModel):
     doctor_id: str
+
+class IntakePaymentUpdate(BaseModel):
+    status: Literal["pending", "confirmed", "rejected"]
 
 # Add your routes to the router instead of directly to app
 @api_router.get("/")
@@ -1245,7 +1263,10 @@ async def get_intakes(_: dict = Depends(require_admin)):
     if db is None:
         raise HTTPException(status_code=503, detail="Base de donnees indisponible")
     intakes = await db.intakes.find({}, {"_id": 0}).to_list(1000)
-    return intakes
+    updated = []
+    for intake in intakes:
+        updated.append(await ensure_meeting_url(intake))
+    return updated
 
 @api_router.get("/intakes/me", response_model=List[IntakeResponse])
 async def get_my_intakes(current_user: dict = Depends(get_current_user)):
@@ -1256,7 +1277,10 @@ async def get_my_intakes(current_user: dict = Depends(get_current_user)):
         .sort("created_at", -1)
         .to_list(1000)
     )
-    return intakes
+    updated = []
+    for intake in intakes:
+        updated.append(await ensure_meeting_url(intake))
+    return updated
 
 @api_router.get("/intakes/{intake_id}", response_model=IntakeResponse)
 async def get_intake(intake_id: str, current_user: dict = Depends(get_current_user)):
@@ -1267,7 +1291,7 @@ async def get_intake(intake_id: str, current_user: dict = Depends(get_current_us
         raise HTTPException(status_code=404, detail="Dossier introuvable")
     if current_user.get("role") != "admin" and intake.get("user_id") and intake.get("user_id") != current_user.get("id"):
         raise HTTPException(status_code=403, detail="Acces refuse")
-    return intake
+    return await ensure_meeting_url(intake)
 
 @api_router.patch("/intakes/{intake_id}/schedule", response_model=IntakeResponse)
 async def schedule_intake(intake_id: str, input: IntakeScheduleUpdate, _: dict = Depends(require_admin)):
@@ -1367,6 +1391,18 @@ async def assign_doctor(intake_id: str, input: IntakeAssignDoctor, _: dict = Dep
         except OpenIMError as exc:
             logger.warning("OpenIM intro message failed: %s", exc)
 
+    await db.intakes.update_one({"id": intake_id}, {"$set": update_fields})
+    updated = {**intake, **update_fields}
+    return updated
+
+@api_router.patch("/intakes/{intake_id}/payment", response_model=IntakeResponse)
+async def update_payment_status(intake_id: str, input: IntakePaymentUpdate, _: dict = Depends(require_admin)):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Base de donnees indisponible")
+    intake = await db.intakes.find_one({"id": intake_id}, {"_id": 0})
+    if not intake:
+        raise HTTPException(status_code=404, detail="Dossier introuvable")
+    update_fields = {"payment_status": input.status}
     await db.intakes.update_one({"id": intake_id}, {"$set": update_fields})
     updated = {**intake, **update_fields}
     return updated

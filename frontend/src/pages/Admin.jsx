@@ -107,6 +107,9 @@ export const Admin = () => {
   const [savingId, setSavingId] = useState(null);
   const [assignValues, setAssignValues] = useState({});
   const [assigningId, setAssigningId] = useState(null);
+  const [paymentUpdatingId, setPaymentUpdatingId] = useState(null);
+  const [paymentError, setPaymentError] = useState('');
+  const [paymentSuccess, setPaymentSuccess] = useState('');
 
   const loadIntakes = async () => {
     setLoading(true);
@@ -253,6 +256,31 @@ export const Admin = () => {
       setDoctorError('Impossible d ajouter les medecins tests.');
     } finally {
       setSeedLoading(false);
+    }
+  };
+
+  const handlePaymentStatus = async (id, status) => {
+    setPaymentUpdatingId(id);
+    setPaymentError('');
+    setPaymentSuccess('');
+    try {
+      const response = await axios.patch(
+        `${API_URL}/api/intakes/${id}/payment`,
+        { status },
+        { headers: authHeaders() },
+      );
+      setIntakes((prev) => prev.map((item) => (item.id === id ? response.data : item)));
+      setPaymentSuccess(status === 'confirmed' ? 'Paiement confirme.' : 'Paiement refuse.');
+    } catch (err) {
+      if (err.response?.status === 401) {
+        setPaymentError('Veuillez vous connecter pour acceder a l administration.');
+      } else if (err.response?.status === 403) {
+        setPaymentError('Acces reserve a l administration.');
+      } else {
+        setPaymentError('Impossible de mettre a jour le paiement.');
+      }
+    } finally {
+      setPaymentUpdatingId(null);
     }
   };
 
@@ -538,6 +566,16 @@ export const Admin = () => {
               {error}
             </div>
           )}
+          {paymentError && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 text-sm text-red-700">
+              {paymentError}
+            </div>
+          )}
+          {paymentSuccess && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-6 text-sm text-emerald-700">
+              {paymentSuccess}
+            </div>
+          )}
 
           {loading ? (
             <div className="flex items-center justify-center py-20">
@@ -559,6 +597,10 @@ export const Admin = () => {
                 const paymentReference = intake.payment_reference || '—';
                 const paymentStatus = paymentStatusLabel[intake.payment_status] || paymentStatusLabel.pending;
                 const paymentTone = paymentStatusTone[intake.payment_status] || paymentStatusTone.pending;
+                const hasPaymentReference = Boolean(intake.payment_reference);
+                const isPaymentConfirmed = intake.payment_status === 'confirmed';
+                const isPaymentRejected = intake.payment_status === 'rejected';
+                const paymentBusy = paymentUpdatingId === intake.id;
 
                 return (
                 <div key={intake.id} className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
@@ -615,6 +657,29 @@ export const Admin = () => {
                     </div>
 
                     <div className="space-y-3">
+                      <div className="grid gap-3">
+                        <label className="text-sm font-medium text-[#0A2540]">Validation paiement</label>
+                        <div className="flex flex-wrap gap-3">
+                          <Button
+                            onClick={() => handlePaymentStatus(intake.id, 'confirmed')}
+                            disabled={!hasPaymentReference || isPaymentConfirmed || paymentBusy}
+                            className="btn-green px-5 py-3"
+                          >
+                            {paymentBusy ? 'Validation...' : isPaymentConfirmed ? 'Confirme' : 'Confirmer'}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => handlePaymentStatus(intake.id, 'rejected')}
+                            disabled={!hasPaymentReference || isPaymentRejected || paymentBusy}
+                            className="px-5 py-3"
+                          >
+                            {paymentBusy ? 'Validation...' : isPaymentRejected ? 'Refuse' : 'Refuser'}
+                          </Button>
+                        </div>
+                        {!hasPaymentReference && (
+                          <p className="text-xs text-[#94A3B8]">Aucune reference de paiement renseignee.</p>
+                        )}
+                      </div>
                       <div className="grid gap-3">
                         <label className="text-sm font-medium text-[#0A2540]">Medecin assigne</label>
                         <select
