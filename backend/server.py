@@ -135,8 +135,6 @@ async def ensure_meeting_url(intake: Optional[dict]) -> Optional[dict]:
         return intake
     intake_id = intake.get("id") or str(uuid.uuid4())
     meeting_url = generate_meeting_url(intake_id)
-    consultation_type = input.consultation_type or "standard"
-    payment_amount = payment_amount_for_type(consultation_type)
     intake["meeting_url"] = meeting_url
     if db is not None and intake.get("id"):
         await db.intakes.update_one(
@@ -1176,6 +1174,8 @@ async def create_intake(input: IntakeCreate, current_user: dict = Depends(get_cu
     intake_id = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
     meeting_url = generate_meeting_url(intake_id)
+    consultation_type = input.consultation_type or "standard"
+    payment_amount = payment_amount_for_type(consultation_type)
 
     openemr_patient_id = None
     if openemr_client.is_configured():
