@@ -142,6 +142,7 @@ export const Consultation = () => {
     scheduleTime: '',
     scheduleLabel: '',
     requestedDoctorId: '',
+    isExpress: false,
     paymentMethod: '',
     paymentPhone: '',
     paymentReference: '',
@@ -325,6 +326,7 @@ export const Consultation = () => {
           reference: formData.paymentReference,
           status: 'pending'
         },
+        consultationType: formData.isExpress ? 'express' : 'standard',
         meetingUrl,
         createdAt: new Date().toISOString()
       };
@@ -692,6 +694,22 @@ export const Consultation = () => {
                 <h2 className="text-2xl font-bold text-[#0A2540] mb-2">Choisissez un créneau</h2>
                 <p className="text-[#64748B] mb-6">Sélectionnez la date et l'heure de votre consultation.</p>
 
+                <div className="bg-[#F8FAFC] border border-slate-200 rounded-2xl p-5 mb-6">
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      id="express"
+                      checked={formData.isExpress}
+                      onCheckedChange={(checked) => updateFormData('isExpress', Boolean(checked))}
+                    />
+                    <Label htmlFor="express" className="text-sm text-[#0A2540] cursor-pointer">
+                      <span className="font-semibold">Consultation express</span>
+                      <span className="block text-xs text-[#64748B] mt-1">
+                        Traitement prioritaire de votre dossier pour une prise en charge rapide.
+                      </span>
+                    </Label>
+                  </div>
+                </div>
+
                 <div className="grid sm:grid-cols-2 gap-4">
                   {scheduleSlots.map((slot) => (
                     <button
@@ -739,6 +757,12 @@ export const Consultation = () => {
                       <div className="flex justify-between gap-4">
                         <span className="text-[#64748B]">Symptômes</span>
                         <span className="font-medium text-[#0A2540] text-right">{summarizeText(formData.symptoms)}</span>
+                      </div>
+                      <div className="flex justify-between gap-4">
+                        <span className="text-[#64748B]">Type</span>
+                        <span className="font-medium text-[#0A2540] text-right">
+                          {formData.isExpress ? 'Express' : 'Standard'}
+                        </span>
                       </div>
                       <div className="flex justify-between gap-4">
                         <span className="text-[#64748B]">Patient</span>
