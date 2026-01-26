@@ -45,6 +45,8 @@ ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
 ADMIN_NAME = os.environ.get("ADMIN_NAME", "Admin Santia")
 ADMIN_PHONE = os.environ.get("ADMIN_PHONE", "")
+STANDARD_PAYMENT_AMOUNT = int(os.environ.get("STANDARD_PAYMENT_AMOUNT", "5000"))
+EXPRESS_PAYMENT_AMOUNT = int(os.environ.get("EXPRESS_PAYMENT_AMOUNT", "8000"))
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -121,6 +123,11 @@ def generate_meeting_url(intake_id: str) -> str:
     room = f"{prefix}-{slug}-{uuid.uuid4().hex[:6]}"
     return f"{jitsi_base_url()}/{room}"
 
+def payment_amount_for_type(consultation_type: str) -> int:
+    if consultation_type == "express":
+        return EXPRESS_PAYMENT_AMOUNT
+    return STANDARD_PAYMENT_AMOUNT
+
 async def ensure_meeting_url(intake: Optional[dict]) -> Optional[dict]:
     if not intake:
         return intake
@@ -128,6 +135,8 @@ async def ensure_meeting_url(intake: Optional[dict]) -> Optional[dict]:
         return intake
     intake_id = intake.get("id") or str(uuid.uuid4())
     meeting_url = generate_meeting_url(intake_id)
+    consultation_type = input.consultation_type or "standard"
+    payment_amount = payment_amount_for_type(consultation_type)
     intake["meeting_url"] = meeting_url
     if db is not None and intake.get("id"):
         await db.intakes.update_one(
@@ -591,6 +600,7 @@ class IntakeCreate(BaseModel):
     email: EmailStr
     city: str
     consent: bool
+    consultation_type: Optional[Literal["standard", "express"]] = "standard"
     payment_method: Optional[str] = None
     payment_phone: Optional[str] = None
     payment_reference: Optional[str] = None
@@ -661,6 +671,7 @@ class IntakeResponse(BaseModel):
     city: str
     consent: bool
     status: str
+    consultation_type: Optional[str] = None
     created_at: str
     scheduled_at: Optional[str] = None
     meeting_url: Optional[str] = None
@@ -1204,10 +1215,11 @@ async def create_intake(input: IntakeCreate, current_user: dict = Depends(get_cu
         "email": input.email,
         "city": input.city,
         "consent": input.consent,
+        "consultation_type": consultation_type,
         "payment_method": input.payment_method,
         "payment_phone": input.payment_phone,
         "payment_reference": input.payment_reference,
-        "payment_amount": input.payment_amount,
+        "payment_amount": payment_amount,
         "payment_status": input.payment_status or "pending",
         "status": "pending",
         "created_at": created_at,

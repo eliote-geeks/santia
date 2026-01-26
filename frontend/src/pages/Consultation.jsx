@@ -35,7 +35,8 @@ import { toast } from '../hooks/use-toast';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 const MEETING_BASE_URL = (process.env.REACT_APP_JITSI_URL || 'https://meet.jit.si').replace(/\/$/, '');
-const PAYMENT_AMOUNT = 5000;
+const STANDARD_PAYMENT_AMOUNT = 5000;
+const EXPRESS_PAYMENT_AMOUNT = 8000;
 const BOOKING_STORAGE_KEY = 'santia_booking';
 
 const categories = [
@@ -217,6 +218,8 @@ export const Consultation = () => {
     }
   };
 
+  const getPaymentAmount = () => (formData.isExpress ? EXPRESS_PAYMENT_AMOUNT : STANDARD_PAYMENT_AMOUNT);
+
   const selectScheduleSlot = (slot) => {
     setFormData(prev => ({
       ...prev,
@@ -281,6 +284,7 @@ export const Consultation = () => {
 
     setIsSubmitting(true);
     try {
+      const paymentAmount = getPaymentAmount();
       const paymentLabel = paymentMethods.find((method) => method.id === formData.paymentMethod)?.label || formData.paymentMethod;
       const payload = {
         category: formData.category,
@@ -294,11 +298,12 @@ export const Consultation = () => {
         email: formData.email,
         city: formData.city,
         consent: formData.consent,
+        consultation_type: formData.isExpress ? 'express' : 'standard',
         requested_doctor_id: formData.requestedDoctorId || undefined,
         payment_method: paymentLabel,
         payment_phone: formData.paymentPhone,
         payment_reference: formData.paymentReference,
-        payment_amount: PAYMENT_AMOUNT,
+        payment_amount: paymentAmount,
         payment_status: 'pending'
       };
 
@@ -321,7 +326,7 @@ export const Consultation = () => {
         },
         payment: {
           method: paymentLabel,
-          amount: PAYMENT_AMOUNT,
+          amount: paymentAmount,
           phone: formData.paymentPhone,
           reference: formData.paymentReference,
           status: 'pending'
@@ -706,6 +711,9 @@ export const Consultation = () => {
                       <span className="block text-xs text-[#64748B] mt-1">
                         Traitement prioritaire de votre dossier pour une prise en charge rapide.
                       </span>
+                      <span className="block text-xs text-[#2ECC71] font-semibold mt-2">
+                        Montant: {formatMoney(getPaymentAmount())} FCFA
+                      </span>
                     </Label>
                   </div>
                 </div>
@@ -782,7 +790,7 @@ export const Consultation = () => {
                       </div>
                       <div className="flex justify-between gap-4">
                         <span className="text-[#64748B]">Montant</span>
-                        <span className="font-semibold text-[#0A2540] text-right">{formatMoney(PAYMENT_AMOUNT)} FCFA</span>
+                        <span className="font-semibold text-[#0A2540] text-right">{formatMoney(getPaymentAmount())} FCFA</span>
                       </div>
                     </div>
                   </div>
@@ -790,7 +798,7 @@ export const Consultation = () => {
                   <div className="bg-[#F8FAFC] rounded-xl p-4 flex items-center justify-between">
                     <div>
                       <p className="text-sm text-[#64748B]">Montant a regler</p>
-                      <p className="text-2xl font-bold text-[#0A2540]">{formatMoney(PAYMENT_AMOUNT)} FCFA</p>
+                      <p className="text-2xl font-bold text-[#0A2540]">{formatMoney(getPaymentAmount())} FCFA</p>
                     </div>
                     <div className="text-xs text-[#2ECC71] font-medium">Paiement sécurisé</div>
                   </div>

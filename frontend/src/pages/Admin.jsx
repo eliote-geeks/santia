@@ -597,6 +597,7 @@ export const Admin = () => {
                 const paymentReference = intake.payment_reference || '—';
                 const paymentStatus = paymentStatusLabel[intake.payment_status] || paymentStatusLabel.pending;
                 const paymentTone = paymentStatusTone[intake.payment_status] || paymentStatusTone.pending;
+                const consultationType = intake.consultation_type === 'express' ? 'Express' : 'Standard';
                 const hasPaymentReference = Boolean(intake.payment_reference);
                 const isPaymentConfirmed = intake.payment_status === 'confirmed';
                 const isPaymentRejected = intake.payment_status === 'rejected';
@@ -640,6 +641,7 @@ export const Admin = () => {
                         <div>
                           <p className="text-xs text-[#64748B]">Paiement</p>
                           <p className="text-sm text-[#0A2540]">{paymentMethod} · {amountLabel}</p>
+                          <p className="text-xs text-[#64748B]">Type: {consultationType}</p>
                           <p className="text-xs text-[#64748B]">Ref: {paymentReference}</p>
                           <span className={`inline-flex mt-1 text-[11px] font-semibold px-2 py-1 rounded-full ${paymentTone}`}>
                             {paymentStatus}
