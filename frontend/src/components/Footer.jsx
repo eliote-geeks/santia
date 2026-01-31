@@ -48,6 +48,16 @@ export const Footer = () => {
                   FAQ
                 </Link>
               </li>
+              <li>
+                <a
+                  href="/docs/USER_GUIDE.html"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-white/70 hover:text-[#2ECC71] transition-colors duration-200"
+                >
+                  Guide utilisateur
+                </a>
+              </li>
             </ul>
           </div>
 
@@ -115,6 +125,9 @@ export const Footer = () => {
               © {new Date().getFullYear()} Santia. Tous droits réservés.
             </p>
             <div className="flex items-center gap-6">
+              <a href="/docs/USER_GUIDE.html" target="_blank" rel="noreferrer" className="text-white/50 hover:text-white/70 text-sm transition-colors duration-200">
+                Guide utilisateur
+              </a>
               <a href="#" className="text-white/50 hover:text-white/70 text-sm transition-colors duration-200">
                 Mentions légales
               </a>

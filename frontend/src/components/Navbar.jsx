@@ -88,6 +88,14 @@ export const Navbar = () => {
             >
               Comment ça marche
             </Link>
+            <a
+              href="/docs/USER_GUIDE.html"
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm font-medium text-[#0A2540] hover:text-[#2ECC71] transition-colors duration-200"
+            >
+              Guide utilisateur
+            </a>
           </div>
 
           {/* CTA Button */}
@@ -138,6 +146,11 @@ export const Navbar = () => {
                 )}
                 <DropdownMenuItem asChild className="cursor-pointer">
                   <Link to="/#faq">FAQ</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild className="cursor-pointer">
+                  <a href="/docs/USER_GUIDE.html" target="_blank" rel="noreferrer">
+                    Guide utilisateur
+                  </a>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild className="cursor-pointer">
                   <a href="tel:+237657817198">Appeler +237 6 57 81 71 98</a>
@@ -200,6 +213,15 @@ export const Navbar = () => {
             >
               FAQ
             </Link>
+            <a
+              href="/docs/USER_GUIDE.html"
+              target="_blank"
+              rel="noreferrer"
+              className="block py-3 text-lg font-medium text-[#0A2540]"
+              onClick={() => setIsOpen(false)}
+            >
+              Guide utilisateur
+            </a>
             {isAuthed ? (
               <>
                 {!isAdmin && (
