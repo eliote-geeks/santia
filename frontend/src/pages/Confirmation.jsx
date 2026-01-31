@@ -34,7 +34,7 @@ export const Confirmation = () => {
   const smsMessage = useMemo(() => {
     const name = booking?.name || 'Patient';
     return `Bonjour ${name}, votre paiement est en cours de validation.\nDepot: ${DEPOSIT_NUMBER}\nCapture: ${paymentProofName || 'reçue'}\nCréneau: ${scheduleLabel}\nLien: ${meetingUrl}\nMerci.`;
-  }, [booking, scheduleLabel, meetingUrl]);
+  }, [booking, scheduleLabel, meetingUrl, paymentProofName]);
 
   return (
     <div className="min-h-screen bg-[#F8FAFC]" data-testid="confirmation-page">
