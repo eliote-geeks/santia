@@ -64,6 +64,12 @@ const formatDateTime = (value) => {
   });
 };
 
+const buildPaymentProofUrl = (proof) => {
+  if (!proof?.data) return '';
+  const type = proof.type || 'image/jpeg';
+  return `data:${type};base64,${proof.data}`;
+};
+
 const formatMoney = (value) => {
   if (value === null || value === undefined || value === '') return '—';
   const amount = Number(value);
@@ -595,11 +601,13 @@ export const Admin = () => {
                   : '—';
                 const paymentMethod = intake.payment_method || 'Mobile Money';
                 const paymentReference = intake.payment_reference || '—';
+                const paymentProofUrl = buildPaymentProofUrl(intake.payment_proof);
                 const paymentStatus = paymentStatusLabel[intake.payment_status] || paymentStatusLabel.pending;
                 const paymentTone = paymentStatusTone[intake.payment_status] || paymentStatusTone.pending;
                 const consultationType = intake.consultation_type === 'express' ? 'Express' : 'Standard';
                 const isExpress = intake.consultation_type === 'express';
                 const hasPaymentReference = Boolean(intake.payment_reference);
+                const hasPaymentProof = Boolean(intake.payment_proof?.data);
                 const isPaymentConfirmed = intake.payment_status === 'confirmed';
                 const isPaymentRejected = intake.payment_status === 'rejected';
                 const paymentBusy = paymentUpdatingId === intake.id;
@@ -648,7 +656,19 @@ export const Admin = () => {
                           <p className="text-xs text-[#64748B]">Paiement</p>
                           <p className="text-sm text-[#0A2540]">{paymentMethod} · {amountLabel}</p>
                           <p className="text-xs text-[#64748B]">Type: {consultationType}</p>
-                          <p className="text-xs text-[#64748B]">Ref: {paymentReference}</p>
+                          {hasPaymentReference && (
+                            <p className="text-xs text-[#64748B]">Ref: {paymentReference}</p>
+                          )}
+                          <div className="text-xs text-[#64748B]">
+                            Capture:{' '}
+                            {paymentProofUrl ? (
+                              <a href={paymentProofUrl} target="_blank" rel="noreferrer" className="text-[#0A2540] underline">
+                                Voir
+                              </a>
+                            ) : (
+                              'Aucune'
+                            )}
+                          </div>
                           <span className={`inline-flex mt-1 text-[11px] font-semibold px-2 py-1 rounded-full ${paymentTone}`}>
                             {paymentStatus}
                           </span>
@@ -670,7 +690,7 @@ export const Admin = () => {
                         <div className="flex flex-wrap gap-3">
                           <Button
                             onClick={() => handlePaymentStatus(intake.id, 'confirmed')}
-                            disabled={!hasPaymentReference || isPaymentConfirmed || paymentBusy}
+                            disabled={!(hasPaymentProof || hasPaymentReference) || isPaymentConfirmed || paymentBusy}
                             className="btn-green px-5 py-3"
                           >
                             {paymentBusy ? 'Validation...' : isPaymentConfirmed ? 'Confirme' : 'Confirmer'}
@@ -678,14 +698,14 @@ export const Admin = () => {
                           <Button
                             variant="outline"
                             onClick={() => handlePaymentStatus(intake.id, 'rejected')}
-                            disabled={!hasPaymentReference || isPaymentRejected || paymentBusy}
+                            disabled={!(hasPaymentProof || hasPaymentReference) || isPaymentRejected || paymentBusy}
                             className="px-5 py-3"
                           >
                             {paymentBusy ? 'Validation...' : isPaymentRejected ? 'Refuse' : 'Refuser'}
                           </Button>
                         </div>
-                        {!hasPaymentReference && (
-                          <p className="text-xs text-[#94A3B8]">Aucune reference de paiement renseignee.</p>
+                        {!hasPaymentProof && !hasPaymentReference && (
+                          <p className="text-xs text-[#94A3B8]">Aucune capture de paiement renseignee.</p>
                         )}
                       </div>
                       <div className="grid gap-3">

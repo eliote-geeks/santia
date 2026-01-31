@@ -79,12 +79,14 @@ const paymentMethods = [
 ];
 
 
-const buildScheduleSlots = () => {
+const buildScheduleSlots = (isExpress) => {
   const slots = [];
   const now = new Date();
   const timeSlots = ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00'];
+  const startOffset = isExpress ? 0 : 1;
+  const endOffset = isExpress ? 0 : 5;
 
-  for (let dayOffset = 0; dayOffset < 5; dayOffset += 1) {
+  for (let dayOffset = startOffset; dayOffset <= endOffset; dayOffset += 1) {
     const baseDate = new Date(now);
     baseDate.setDate(now.getDate() + dayOffset);
     timeSlots.forEach((time) => {
@@ -127,8 +129,6 @@ export const Consultation = () => {
   const [doctorsError, setDoctorsError] = useState('');
   const [depositCopied, setDepositCopied] = useState(false);
 
-  const scheduleSlots = useMemo(() => buildScheduleSlots(), []);
-
   const [formData, setFormData] = useState({
     category: searchParams.get('category') || '',
     symptoms: '',
@@ -148,9 +148,11 @@ export const Consultation = () => {
     isExpress: false,
     paymentMethod: '',
     paymentPhone: '',
-    paymentReference: '',
+    paymentProof: null,
     consent: false
   });
+
+  const scheduleSlots = useMemo(() => buildScheduleSlots(formData.isExpress), [formData.isExpress]);
 
   const selectedDoctor = useMemo(
     () => availableDoctors.find((doctor) => doctor.id === formData.requestedDoctorId),
@@ -207,11 +209,25 @@ export const Consultation = () => {
     fetchDoctors();
   }, [formData.category, formData.requestedDoctorId]);
 
+  useEffect(() => {
+    if (!formData.scheduleSlotId) return;
+    const stillAvailable = scheduleSlots.find((slot) => slot.id === formData.scheduleSlotId);
+    if (!stillAvailable) {
+      setFormData(prev => ({
+        ...prev,
+        scheduleSlotId: '',
+        scheduleDate: '',
+        scheduleTime: '',
+        scheduleLabel: ''
+      }));
+    }
+  }, [scheduleSlots, formData.scheduleSlotId]);
+
   const updateFormData = (field, value) => {
     setFormData(prev => {
       const next = { ...prev, [field]: value };
     if (['paymentMethod', 'paymentPhone'].includes(field)) {
-      next.paymentReference = '';
+      next.paymentProof = null;
     }
       return next;
     });
@@ -239,6 +255,34 @@ export const Consultation = () => {
   };
 
   const getPaymentAmount = () => (formData.isExpress ? EXPRESS_PAYMENT_AMOUNT : STANDARD_PAYMENT_AMOUNT);
+
+  const handlePaymentProofChange = (file) => {
+    if (!file) {
+      setFormData(prev => ({ ...prev, paymentProof: null }));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result || '';
+      if (typeof result !== 'string') return;
+      const parts = result.split(',');
+      const base64Data = parts[1] || '';
+      const mimeMatch = parts[0]?.match(/data:(.*);base64/);
+      const mimeType = file.type || mimeMatch?.[1] || 'image/jpeg';
+      setFormData(prev => ({
+        ...prev,
+        paymentProof: {
+          name: file.name,
+          type: mimeType,
+          data: base64Data
+        }
+      }));
+      if (errors.paymentProof) {
+        setErrors(prev => ({ ...prev, paymentProof: null }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const selectScheduleSlot = (slot) => {
     setFormData(prev => ({
@@ -273,7 +317,7 @@ export const Consultation = () => {
     } else if (step === 5) {
       if (!formData.paymentMethod) newErrors.paymentMethod = 'Choisissez un moyen de paiement';
       if (!formData.paymentPhone.trim()) newErrors.paymentPhone = 'Indiquez le numéro Mobile Money';
-      if (!formData.paymentReference.trim()) newErrors.paymentReference = 'Indiquez la reference de paiement';
+      if (!formData.paymentProof?.data) newErrors.paymentProof = 'Ajoutez la capture de paiement';
       if (!formData.consent) newErrors.consent = 'Vous devez accepter les conditions';
     }
 
@@ -322,7 +366,7 @@ export const Consultation = () => {
         requested_doctor_id: formData.requestedDoctorId || undefined,
         payment_method: paymentLabel,
         payment_phone: formData.paymentPhone,
-        payment_reference: formData.paymentReference,
+        payment_proof: formData.paymentProof || undefined,
         payment_amount: paymentAmount,
         payment_status: 'pending'
       };
@@ -348,7 +392,7 @@ export const Consultation = () => {
           method: paymentLabel,
           amount: paymentAmount,
           phone: formData.paymentPhone,
-          reference: formData.paymentReference,
+          proofName: formData.paymentProof?.name || '',
           status: 'pending'
         },
         consultationType: formData.isExpress ? 'express' : 'standard',
@@ -717,7 +761,11 @@ export const Consultation = () => {
             {currentStep === 4 && (
               <div data-testid="step-4">
                 <h2 className="text-2xl font-bold text-[#0A2540] mb-2">Choisissez un créneau</h2>
-                <p className="text-[#64748B] mb-6">Sélectionnez la date et l'heure de votre consultation.</p>
+                <p className="text-[#64748B] mb-6">
+                  {formData.isExpress
+                    ? 'Créneaux express disponibles uniquement aujourd\'hui.'
+                    : 'Créneaux standard disponibles à partir de demain.'}
+                </p>
 
                 <div className="bg-[#F8FAFC] border border-slate-200 rounded-2xl p-5 mb-6">
                   <div className="flex items-start gap-3">
@@ -738,23 +786,29 @@ export const Consultation = () => {
                   </div>
                 </div>
 
-                <div className="grid sm:grid-cols-2 gap-4">
-                  {scheduleSlots.map((slot) => (
-                    <button
-                      key={slot.id}
-                      type="button"
-                      onClick={() => selectScheduleSlot(slot)}
-                      className={`p-4 rounded-xl border-2 text-left transition-all duration-200 ${
-                        formData.scheduleSlotId === slot.id
-                          ? 'border-[#2ECC71] bg-[#2ECC71]/5 ring-1 ring-[#2ECC71]'
-                          : 'border-slate-200 hover:border-[#0A2540]/30 hover:bg-slate-50'
-                      }`}
-                    >
-                      <p className="font-semibold text-[#0A2540]">{slot.label}</p>
-                      <p className="text-xs text-[#64748B] mt-1">Consultation vidéo · 20 min</p>
-                    </button>
-                  ))}
-                </div>
+                {scheduleSlots.length === 0 ? (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+                    Aucun créneau disponible pour le moment. Choisissez une consultation standard ou réessayez plus tard.
+                  </div>
+                ) : (
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    {scheduleSlots.map((slot) => (
+                      <button
+                        key={slot.id}
+                        type="button"
+                        onClick={() => selectScheduleSlot(slot)}
+                        className={`p-4 rounded-xl border-2 text-left transition-all duration-200 ${
+                          formData.scheduleSlotId === slot.id
+                            ? 'border-[#2ECC71] bg-[#2ECC71]/5 ring-1 ring-[#2ECC71]'
+                            : 'border-slate-200 hover:border-[#0A2540]/30 hover:bg-slate-50'
+                        }`}
+                      >
+                        <p className="font-semibold text-[#0A2540]">{slot.label}</p>
+                        <p className="text-xs text-[#64748B] mt-1">Consultation vidéo · 20 min</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {errors.scheduleSlotId && <p className="text-red-500 text-sm mt-4">{errors.scheduleSlotId}</p>}
 
@@ -806,6 +860,12 @@ export const Consultation = () => {
                         <span className="text-[#64748B]">Opérateur</span>
                         <span className="font-medium text-[#0A2540] text-right">
                           {getPaymentMethodLabel(formData.paymentMethod)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between gap-4">
+                        <span className="text-[#64748B]">Capture</span>
+                        <span className="font-medium text-[#0A2540] text-right">
+                          {formData.paymentProof?.name ? 'Ajoutée' : '—'}
                         </span>
                       </div>
                       <div className="flex justify-between gap-4">
@@ -864,7 +924,7 @@ export const Consultation = () => {
                   <div className="bg-white border border-slate-200 rounded-2xl p-4">
                     <p className="text-sm font-semibold text-[#0A2540]">Depot Mobile Money</p>
                     <p className="text-xs text-[#64748B] mt-2">
-                      Effectuez le depot sur le numero suivant puis indiquez la reference.
+                      Effectuez le depot sur le numero suivant puis ajoutez la capture de paiement.
                     </p>
                     <div className="mt-3 flex flex-wrap items-center gap-3">
                       <p className="text-lg font-bold text-[#0A2540] tracking-wide">{DEPOSIT_NUMBER}</p>
@@ -894,20 +954,22 @@ export const Consultation = () => {
                   </div>
 
                   <div className="bg-[#0A2540]/5 border border-[#0A2540]/10 rounded-2xl p-5">
-                    <p className="text-sm text-[#0A2540] font-medium">Reference de paiement</p>
+                    <p className="text-sm text-[#0A2540] font-medium">Capture de paiement</p>
                     <p className="text-xs text-[#64748B] mt-2">
-                      Indiquez la reference Mobile Money. Nous confirmerons le depot avant la consultation.
+                      Ajoutez une capture (reçu Mobile Money). Nous confirmerons le depot avant la consultation.
                     </p>
                     <div className="mt-4 space-y-3">
                       <Input
-                        id="paymentReference"
-                        type="text"
-                        placeholder="REF-123456"
-                        value={formData.paymentReference}
-                        onChange={(e) => updateFormData('paymentReference', e.target.value)}
+                        id="paymentProof"
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handlePaymentProofChange(e.target.files?.[0])}
                         className="input-santia"
                       />
-                      {errors.paymentReference && <p className="text-red-500 text-sm">{errors.paymentReference}</p>}
+                      {formData.paymentProof?.name && (
+                        <p className="text-xs text-[#0A2540]">Fichier: {formData.paymentProof.name}</p>
+                      )}
+                      {errors.paymentProof && <p className="text-red-500 text-sm">{errors.paymentProof}</p>}
                     </div>
                   </div>
 

@@ -602,6 +602,7 @@ class IntakeCreate(BaseModel):
     payment_method: Optional[str] = None
     payment_phone: Optional[str] = None
     payment_reference: Optional[str] = None
+    payment_proof: Optional[dict] = None
     payment_amount: Optional[int] = None
     payment_status: Optional[str] = None
     requested_doctor_id: Optional[str] = None
@@ -686,6 +687,7 @@ class IntakeResponse(BaseModel):
     payment_method: Optional[str] = None
     payment_phone: Optional[str] = None
     payment_reference: Optional[str] = None
+    payment_proof: Optional[dict] = None
     payment_amount: Optional[int] = None
     payment_status: Optional[str] = None
 
@@ -1219,6 +1221,7 @@ async def create_intake(input: IntakeCreate, current_user: dict = Depends(get_cu
         "payment_method": input.payment_method,
         "payment_phone": input.payment_phone,
         "payment_reference": input.payment_reference,
+        "payment_proof": input.payment_proof,
         "payment_amount": payment_amount,
         "payment_status": input.payment_status or "pending",
         "status": "pending",

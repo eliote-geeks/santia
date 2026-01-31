@@ -28,12 +28,12 @@ export const Confirmation = () => {
   const meetingUrl = booking?.meetingUrl || DEFAULT_MEETING_URL;
   const paymentMethod = booking?.payment?.method || 'Orange Money';
   const paymentAmount = booking?.payment?.amount || 5000;
-  const paymentReference = booking?.payment?.reference || 'REF-000000';
+  const paymentProofName = booking?.payment?.proofName || '';
   const patientName = booking?.name || 'Votre consultation';
 
   const smsMessage = useMemo(() => {
     const name = booking?.name || 'Patient';
-    return `Bonjour ${name}, votre paiement est en cours de validation.\nDepot: ${DEPOSIT_NUMBER}\nCréneau: ${scheduleLabel}\nLien: ${meetingUrl}\nMerci.`;
+    return `Bonjour ${name}, votre paiement est en cours de validation.\nDepot: ${DEPOSIT_NUMBER}\nCapture: ${paymentProofName || 'reçue'}\nCréneau: ${scheduleLabel}\nLien: ${meetingUrl}\nMerci.`;
   }, [booking, scheduleLabel, meetingUrl]);
 
   return (
@@ -113,7 +113,7 @@ export const Confirmation = () => {
               </div>
               <div className="mt-4 flex items-center justify-between text-xs text-[#64748B]">
                 <span>Montant payé : {formatMoney(paymentAmount)} FCFA</span>
-                <span>Réf : {paymentReference}</span>
+                <span>Capture : {paymentProofName || 'reçue'}</span>
               </div>
             </div>
 
