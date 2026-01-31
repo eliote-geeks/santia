@@ -146,6 +146,7 @@ export const PatientProfile = () => {
   const paymentProofUrl = intake?.payment_proof?.data
     ? `data:${intake.payment_proof.type || 'image/jpeg'};base64,${intake.payment_proof.data}`
     : '';
+  const isProofPdf = (intake?.payment_proof?.type || '').includes('pdf');
   const paymentStatus = paymentStatusLabel[intake?.payment_status] || paymentStatusLabel.pending;
   const paymentTone = paymentStatusTone[intake?.payment_status] || paymentStatusTone.pending;
   const nextAction = intake?.status === 'scheduled'
@@ -416,9 +417,26 @@ export const PatientProfile = () => {
                 <div className="rounded-xl border border-slate-200 p-4">
                   <p className="text-[#64748B]">Capture</p>
                   {paymentProofUrl ? (
-                    <a href={paymentProofUrl} target="_blank" rel="noreferrer" className="font-semibold text-[#0A2540] underline">
-                      Voir la capture
-                    </a>
+                    <div className="mt-2">
+                      {isProofPdf ? (
+                        <a
+                          href={paymentProofUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs text-[#0A2540] hover:border-[#2ECC71]"
+                        >
+                          Voir le PDF
+                        </a>
+                      ) : (
+                        <a href={paymentProofUrl} target="_blank" rel="noreferrer">
+                          <img
+                            src={paymentProofUrl}
+                            alt="Capture de paiement"
+                            className="h-16 w-24 rounded-lg border border-slate-200 object-cover"
+                          />
+                        </a>
+                      )}
+                    </div>
                   ) : (
                     <p className="font-semibold text-[#0A2540]">Aucune</p>
                   )}

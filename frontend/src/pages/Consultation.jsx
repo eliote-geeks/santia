@@ -317,7 +317,7 @@ export const Consultation = () => {
     } else if (step === 5) {
       if (!formData.paymentMethod) newErrors.paymentMethod = 'Choisissez un moyen de paiement';
       if (!formData.paymentPhone.trim()) newErrors.paymentPhone = 'Indiquez le numéro Mobile Money';
-      if (!formData.paymentProof?.data) newErrors.paymentProof = 'Ajoutez la capture de paiement';
+      if (!formData.paymentProof?.data) newErrors.paymentProof = 'Ajoutez la capture de paiement (image ou PDF)';
       if (!formData.consent) newErrors.consent = 'Vous devez accepter les conditions';
     }
 
@@ -956,13 +956,13 @@ export const Consultation = () => {
                   <div className="bg-[#0A2540]/5 border border-[#0A2540]/10 rounded-2xl p-5">
                     <p className="text-sm text-[#0A2540] font-medium">Capture de paiement</p>
                     <p className="text-xs text-[#64748B] mt-2">
-                      Ajoutez une capture (reçu Mobile Money). Nous confirmerons le depot avant la consultation.
+                      Ajoutez une capture (image ou PDF). Nous confirmerons le depot avant la consultation.
                     </p>
                     <div className="mt-4 space-y-3">
                       <Input
                         id="paymentProof"
                         type="file"
-                        accept="image/*"
+                        accept="image/*,application/pdf"
                         onChange={(e) => handlePaymentProofChange(e.target.files?.[0])}
                         className="input-santia"
                       />

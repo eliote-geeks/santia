@@ -602,6 +602,7 @@ export const Admin = () => {
                 const paymentMethod = intake.payment_method || 'Mobile Money';
                 const paymentReference = intake.payment_reference || '—';
                 const paymentProofUrl = buildPaymentProofUrl(intake.payment_proof);
+                const isProofPdf = (intake.payment_proof?.type || '').includes('pdf');
                 const paymentStatus = paymentStatusLabel[intake.payment_status] || paymentStatusLabel.pending;
                 const paymentTone = paymentStatusTone[intake.payment_status] || paymentStatusTone.pending;
                 const consultationType = intake.consultation_type === 'express' ? 'Express' : 'Standard';
@@ -662,13 +663,33 @@ export const Admin = () => {
                           <div className="text-xs text-[#64748B]">
                             Capture:{' '}
                             {paymentProofUrl ? (
-                              <a href={paymentProofUrl} target="_blank" rel="noreferrer" className="text-[#0A2540] underline">
-                                Voir
-                              </a>
+                              <span className="text-[#0A2540]">Ajoutée</span>
                             ) : (
                               'Aucune'
                             )}
                           </div>
+                          {paymentProofUrl && (
+                            <div className="mt-2">
+                              {isProofPdf ? (
+                                <a
+                                  href={paymentProofUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs text-[#0A2540] hover:border-[#2ECC71]"
+                                >
+                                  Voir le PDF
+                                </a>
+                              ) : (
+                                <a href={paymentProofUrl} target="_blank" rel="noreferrer">
+                                  <img
+                                    src={paymentProofUrl}
+                                    alt="Capture de paiement"
+                                    className="h-16 w-24 rounded-lg border border-slate-200 object-cover"
+                                  />
+                                </a>
+                              )}
+                            </div>
+                          )}
                           <span className={`inline-flex mt-1 text-[11px] font-semibold px-2 py-1 rounded-full ${paymentTone}`}>
                             {paymentStatus}
                           </span>
