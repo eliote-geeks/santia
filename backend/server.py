@@ -690,6 +690,7 @@ class IntakeResponse(BaseModel):
     payment_proof: Optional[dict] = None
     payment_amount: Optional[int] = None
     payment_status: Optional[str] = None
+    payment_chat_notified: Optional[bool] = None
 
 class IntakeScheduleUpdate(BaseModel):
     scheduled_at: datetime
@@ -1417,7 +1418,40 @@ async def update_payment_status(intake_id: str, input: IntakePaymentUpdate, _: d
     intake = await db.intakes.find_one({"id": intake_id}, {"_id": 0})
     if not intake:
         raise HTTPException(status_code=404, detail="Dossier introuvable")
+    previous_status = intake.get("payment_status")
     update_fields = {"payment_status": input.status}
+
+    if input.status == "confirmed" and previous_status != "confirmed":
+        patient_openim_id = intake.get("openim_patient_id")
+        doctor_openim_id = intake.get("openim_doctor_id")
+        if not doctor_openim_id and intake.get("assigned_doctor_id"):
+            doctor = await db.doctors.find_one({"id": intake["assigned_doctor_id"]}, {"_id": 0})
+            if doctor:
+                doctor_openim_id = doctor.get("openim_user_id")
+                if doctor_openim_id:
+                    update_fields["openim_doctor_id"] = doctor_openim_id
+        if not patient_openim_id and intake.get("user_id"):
+            patient_user = await db.users.find_one({"id": intake["user_id"]}, {"_id": 0})
+            if patient_user:
+                patient_openim_id = patient_user.get("openim_user_id")
+                if patient_openim_id:
+                    update_fields["openim_patient_id"] = patient_openim_id
+        if openim_client.can_send_message() and patient_openim_id and doctor_openim_id:
+            patient_name = intake.get("name", "Patient")
+            message = (
+                f"Bonjour Dr, le paiement de {patient_name} est approuve. "
+                "Merci d initier la conversation pour la teleconsultation."
+            )
+            try:
+                await asyncio.to_thread(
+                    openim_client.send_text_message,
+                    patient_openim_id,
+                    doctor_openim_id,
+                    message,
+                )
+                update_fields["payment_chat_notified"] = True
+            except OpenIMError as exc:
+                logger.warning("OpenIM payment message failed: %s", exc)
     await db.intakes.update_one({"id": intake_id}, {"$set": update_fields})
     updated = {**intake, **update_fields}
     return updated
