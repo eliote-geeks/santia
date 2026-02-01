@@ -14,6 +14,17 @@
     --santia-border: #E2E8F0;
 }
 
+.dark {
+    color-scheme: dark;
+    --santia-primary: #E2E8F0;
+    --santia-green: #2ECC71;
+    --santia-white: #0B1220;
+    --santia-warm: #0F172A;
+    --santia-slate: #0F172A;
+    --santia-muted: #94A3B8;
+    --santia-border: #1F2937;
+}
+
 body {
     margin: 0;
     font-family: 'Manrope', sans-serif;
@@ -79,6 +90,30 @@ code {
         --chart-4: 43 74% 66%;
         --chart-5: 27 87% 67%;
         --radius: 0.75rem;
+    }
+}
+
+@layer base {
+    .dark {
+        --background: 222 47% 11%;
+        --foreground: 210 40% 96%;
+        --card: 222 45% 15%;
+        --card-foreground: 210 40% 96%;
+        --popover: 222 45% 15%;
+        --popover-foreground: 210 40% 96%;
+        --primary: 210 71% 18%;
+        --primary-foreground: 0 0% 100%;
+        --secondary: 145 63% 49%;
+        --secondary-foreground: 210 40% 96%;
+        --muted: 217 32% 17%;
+        --muted-foreground: 215 16% 65%;
+        --accent: 145 63% 49%;
+        --accent-foreground: 210 40% 96%;
+        --destructive: 0 72% 51%;
+        --destructive-foreground: 0 0% 98%;
+        --border: 215 28% 21%;
+        --input: 215 28% 21%;
+        --ring: 210 71% 18%;
     }
 }
 
@@ -172,6 +207,12 @@ code {
            transition-colors duration-200;
 }
 
+.dark .btn-secondary {
+    background-color: rgba(15, 23, 42, 0.8);
+    border-color: var(--santia-primary);
+    color: var(--santia-primary);
+}
+
 .btn-green {
     @apply bg-[#2ECC71] text-[#0A2540] font-semibold rounded-full px-8 py-4 
            shadow-lg hover:shadow-xl transform hover:-translate-y-0.5
@@ -197,6 +238,10 @@ code {
            bg-slate-50 focus:bg-white transition-colors duration-200 text-lg;
 }
 
+.dark .input-santia {
+    @apply border-slate-700 bg-slate-900/60 text-slate-100;
+}
+
 /* Section backgrounds */
 .bg-warm {
     background-color: var(--santia-warm);
@@ -210,6 +255,40 @@ code {
 .glass-header {
     backdrop-filter: blur(16px);
     background-color: rgba(255, 255, 255, 0.9);
+}
+
+.dark .glass-header {
+    background-color: rgba(15, 23, 42, 0.92);
+}
+
+.dark .bg-white {
+    background-color: var(--santia-white) !important;
+}
+
+.dark .bg-\[\#F8FAFC\] {
+    background-color: var(--santia-slate) !important;
+}
+
+.dark .bg-slate-100,
+.dark .hover\:bg-slate-100:hover {
+    background-color: rgba(15, 23, 42, 0.7) !important;
+}
+
+.dark .bg-slate-50 {
+    background-color: rgba(15, 23, 42, 0.6) !important;
+}
+
+.dark .text-\[\#0A2540\] {
+    color: var(--santia-primary) !important;
+}
+
+.dark .text-\[\#64748B\] {
+    color: var(--santia-muted) !important;
+}
+
+.dark .border-slate-100,
+.dark .border-slate-200 {
+    border-color: var(--santia-border) !important;
 }
 
 @layer base {

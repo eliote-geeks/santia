@@ -32,7 +32,7 @@ export const Hero = () => {
             <div className="flex flex-col sm:flex-row gap-4 mb-12 animate-fade-in-up stagger-3">
               <a 
                 href="#specialites" 
-                className="btn-primary inline-flex items-center justify-center gap-2 text-lg py-5 px-8"
+                className="btn-primary inline-flex items-center justify-center gap-2 text-base py-3.5 px-6"
                 data-testid="hero-cta-primary"
               >
                 Choisir une pathologie
@@ -40,7 +40,7 @@ export const Hero = () => {
               </a>
               <Link 
                 to="/consultation" 
-                className="btn-secondary inline-flex items-center justify-center text-lg py-5 px-8"
+                className="btn-secondary inline-flex items-center justify-center text-base py-3.5 px-6"
                 data-testid="hero-cta-secondary"
               >
                 Démarrer la consultation

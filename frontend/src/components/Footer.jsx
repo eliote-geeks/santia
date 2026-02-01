@@ -122,7 +122,15 @@ export const Footer = () => {
         <div className="border-t border-white/10 mt-12 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-white/50 text-sm">
-              © {new Date().getFullYear()} Santia. Tous droits réservés.
+              © {new Date().getFullYear()} Santia. Tous droits réservés. ·{' '}
+              <a
+                href="https://www.linkedin.com/in/paul-eliote-180015263"
+                target="_blank"
+                rel="noreferrer"
+                className="text-white/60 hover:text-white transition-colors duration-200"
+              >
+                Made by Father Paul
+              </a>
             </p>
             <div className="flex items-center gap-6">
               <a href="/docs/USER_GUIDE.html" target="_blank" rel="noreferrer" className="text-white/50 hover:text-white/70 text-sm transition-colors duration-200">

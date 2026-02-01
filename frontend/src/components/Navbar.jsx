@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, Menu, X } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Menu, Moon, Sun, X } from 'lucide-react';
 import { clearAuth, getToken, getUser } from '../lib/auth';
 import { NotificationBell } from './NotificationBell';
 import {
@@ -13,6 +13,7 @@ import {
 
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [theme, setTheme] = useState('light');
   const location = useLocation();
   const navigate = useNavigate();
   const isAuthed = !!getToken();
@@ -32,6 +33,24 @@ export const Navbar = () => {
     } else {
       navigate('/');
     }
+  };
+  const applyTheme = (value) => {
+    if (typeof document === 'undefined') return;
+    document.documentElement.classList.toggle('dark', value === 'dark');
+    localStorage.setItem('santia-theme', value);
+  };
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = localStorage.getItem('santia-theme');
+    const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+    const initial = stored === 'dark' || stored === 'light' ? stored : prefersDark ? 'dark' : 'light';
+    setTheme(initial);
+    applyTheme(initial);
+  }, []);
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    applyTheme(next);
   };
 
   return (
@@ -101,6 +120,15 @@ export const Navbar = () => {
           {/* CTA Button */}
           <div className="hidden md:flex items-center gap-4">
             <NotificationBell />
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="h-10 w-10 rounded-xl border border-slate-200 flex items-center justify-center text-[#0A2540] hover:border-[#2ECC71] hover:text-[#2ECC71] transition-colors duration-200"
+              aria-label={theme === 'dark' ? 'Activer le mode clair' : 'Activer le mode sombre'}
+              data-testid="theme-toggle"
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -169,6 +197,14 @@ export const Navbar = () => {
           {/* Mobile Menu Button */}
           <div className="md:hidden flex items-center gap-2">
             <NotificationBell className="h-9 w-9" iconClassName="w-4 h-4" />
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="h-9 w-9 rounded-lg border border-slate-200 flex items-center justify-center text-[#0A2540] hover:border-[#2ECC71] hover:text-[#2ECC71] transition-colors duration-200"
+              aria-label={theme === 'dark' ? 'Activer le mode clair' : 'Activer le mode sombre'}
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
             <button 
               className="p-2 rounded-lg hover:bg-slate-100 transition-colors duration-200"
               onClick={() => setIsOpen(!isOpen)}
