@@ -35,7 +35,7 @@ const trustItems = [
 
 export const TrustSection = () => {
   return (
-    <section className="py-16 md:py-24 bg-[#FDFBF7]" data-testid="trust-section">
+    <section className="py-16 md:py-24 bg-warm" data-testid="trust-section">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12 md:mb-16">
           <h2 className="text-3xl md:text-4xl font-bold text-[#0A2540] mb-4 animate-fade-in-up" data-testid="trust-title">
