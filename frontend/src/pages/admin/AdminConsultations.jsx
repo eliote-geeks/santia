@@ -206,9 +206,6 @@ export const AdminConsultations = () => {
       return 0;
     });
   }, [filteredIntakes, sortKey, sortDir]);
-    if (showCompleted) return intakes;
-    return intakes.filter((item) => item.status !== 'done');
-  }, [intakes, showCompleted]);
 
   const totalPages = Math.max(1, Math.ceil(sortedIntakes.length / pageSize));
   const paginatedIntakes = sortedIntakes.slice((page - 1) * pageSize, page * pageSize);
