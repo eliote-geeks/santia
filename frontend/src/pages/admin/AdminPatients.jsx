@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { ChevronDown, ChevronUp, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '../../components/ui/button';
+import { DataTableToolbar } from '../../components/DataTableToolbar';
 import { Pagination } from '../../components/Pagination';
 import { authHeaders, getToken, getUser } from '../../lib/auth';
 import { AdminLayout } from './AdminLayout';
@@ -35,7 +36,32 @@ export const AdminPatients = () => {
   const [patientLoading, setPatientLoading] = useState(true);
   const [patientError, setPatientError] = useState('');
   const [page, setPage] = useState(1);
-  const pageSize = 10;
+  const [pageSize, setPageSize] = useState(10);
+  const [query, setQuery] = useState('');
+  const [sortKey, setSortKey] = useState('created_at');
+  const [sortDir, setSortDir] = useState('desc');
+
+  const handleSort = (key) => {
+    if (sortKey === key) {
+      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  const SortButton = ({ columnKey, label }) => (
+    <button
+      type="button"
+      onClick={() => handleSort(columnKey)}
+      className="flex items-center gap-1 text-left text-sm font-semibold text-[#0A2540] hover:text-[#2ECC71]"
+    >
+      {label}
+      {sortKey === columnKey ? (
+        sortDir === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+      ) : null}
+    </button>
+  );
 
   const loadPatients = async () => {
     setPatientLoading(true);
@@ -69,11 +95,52 @@ export const AdminPatients = () => {
     loadPatients();
   }, []);
 
-  const totalPages = Math.max(1, Math.ceil(patients.length / pageSize));
+  const filteredPatients = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    if (!term) return patients;
+    return patients.filter((patient) =>
+      [patient.name, patient.email, patient.phone, patient.id]
+        .filter(Boolean)
+        .some((value) => value.toString().toLowerCase().includes(term))
+    );
+  }, [patients, query]);
+
+  const sortedPatients = useMemo(() => {
+    const getValue = (patient) => {
+      switch (sortKey) {
+        case 'name':
+          return patient.name || '';
+        case 'email':
+          return patient.email || '';
+        case 'phone':
+          return patient.phone || '';
+        case 'created_at':
+        default:
+          return patient.created_at || '';
+      }
+    };
+    return [...filteredPatients].sort((a, b) => {
+      const aVal = getValue(a);
+      const bVal = getValue(b);
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredPatients, sortKey, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedPatients.length / pageSize));
   const paginatedPatients = useMemo(
-    () => patients.slice((page - 1) * pageSize, page * pageSize),
-    [patients, page]
+    () => sortedPatients.slice((page - 1) * pageSize, page * pageSize),
+    [sortedPatients, page, pageSize]
   );
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, pageSize]);
 
   return (
     <AdminLayout
@@ -101,14 +168,30 @@ export const AdminPatients = () => {
           </div>
         ) : (
           <>
+            <DataTableToolbar
+              query={query}
+              onQueryChange={setQuery}
+              pageSize={pageSize}
+              onPageSizeChange={setPageSize}
+              totalCount={sortedPatients.length}
+              label="patients"
+            />
             <div className="overflow-auto border border-slate-200 rounded-2xl">
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-50 text-[#0A2540]">
                   <tr>
-                    <th className="text-left px-4 py-3 font-semibold">Patient</th>
-                    <th className="text-left px-4 py-3 font-semibold">Email</th>
-                    <th className="text-left px-4 py-3 font-semibold">Telephone</th>
-                    <th className="text-left px-4 py-3 font-semibold">Inscription</th>
+                    <th className="text-left px-4 py-3">
+                      <SortButton columnKey="name" label="Patient" />
+                    </th>
+                    <th className="text-left px-4 py-3">
+                      <SortButton columnKey="email" label="Email" />
+                    </th>
+                    <th className="text-left px-4 py-3">
+                      <SortButton columnKey="phone" label="Telephone" />
+                    </th>
+                    <th className="text-left px-4 py-3">
+                      <SortButton columnKey="created_at" label="Inscription" />
+                    </th>
                     <th className="text-left px-4 py-3 font-semibold">OpenIM</th>
                     <th className="text-left px-4 py-3 font-semibold">Actions</th>
                   </tr>

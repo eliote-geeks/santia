@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import { Loader2, RefreshCw, UserPlus } from 'lucide-react';
+import { ChevronDown, ChevronUp, Loader2, RefreshCw, UserPlus } from 'lucide-react';
 import { Button } from '../../components/ui/button';
+import { DataTableToolbar } from '../../components/DataTableToolbar';
 import { Pagination } from '../../components/Pagination';
 import { authHeaders, getToken, getUser } from '../../lib/auth';
 import { AdminLayout } from './AdminLayout';
@@ -53,7 +54,32 @@ export const AdminDoctors = () => {
   const [seedMessage, setSeedMessage] = useState('');
   const [seedDetails, setSeedDetails] = useState([]);
   const [page, setPage] = useState(1);
-  const pageSize = 8;
+  const [pageSize, setPageSize] = useState(8);
+  const [query, setQuery] = useState('');
+  const [sortKey, setSortKey] = useState('created_at');
+  const [sortDir, setSortDir] = useState('desc');
+
+  const handleSort = (key) => {
+    if (sortKey === key) {
+      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  const SortButton = ({ columnKey, label }) => (
+    <button
+      type="button"
+      onClick={() => handleSort(columnKey)}
+      className="flex items-center gap-1 text-left text-sm font-semibold text-[#0A2540] hover:text-[#2ECC71]"
+    >
+      {label}
+      {sortKey === columnKey ? (
+        sortDir === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+      ) : null}
+    </button>
+  );
 
   const loadDoctors = async () => {
     setDoctorLoading(true);
@@ -154,11 +180,61 @@ export const AdminDoctors = () => {
     }
   };
 
-  const totalPages = Math.max(1, Math.ceil(doctors.length / pageSize));
+  const filteredDoctors = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    if (!term) return doctors;
+    return doctors.filter((doctor) =>
+      [
+        doctor.name,
+        doctor.email,
+        doctor.phone,
+        doctor.specialty,
+        doctor.category,
+        doctor.id
+      ]
+        .filter(Boolean)
+        .some((value) => value.toString().toLowerCase().includes(term))
+    );
+  }, [doctors, query]);
+
+  const sortedDoctors = useMemo(() => {
+    const getValue = (doctor) => {
+      switch (sortKey) {
+        case 'name':
+          return doctor.name || '';
+        case 'specialty':
+          return doctor.specialty || '';
+        case 'category':
+          return doctor.category || '';
+        case 'email':
+          return doctor.email || '';
+        case 'created_at':
+        default:
+          return doctor.created_at || '';
+      }
+    };
+    return [...filteredDoctors].sort((a, b) => {
+      const aVal = getValue(a);
+      const bVal = getValue(b);
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredDoctors, sortKey, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedDoctors.length / pageSize));
   const paginatedDoctors = useMemo(
-    () => doctors.slice((page - 1) * pageSize, page * pageSize),
-    [doctors, page]
+    () => sortedDoctors.slice((page - 1) * pageSize, page * pageSize),
+    [sortedDoctors, page, pageSize]
   );
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, pageSize]);
 
   return (
     <AdminLayout
@@ -295,14 +371,30 @@ export const AdminDoctors = () => {
           </div>
         ) : (
           <>
+            <DataTableToolbar
+              query={query}
+              onQueryChange={setQuery}
+              pageSize={pageSize}
+              onPageSizeChange={setPageSize}
+              totalCount={sortedDoctors.length}
+              label="medecins"
+            />
             <div className="overflow-auto border border-slate-200 rounded-2xl">
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-50 text-[#0A2540]">
                   <tr>
-                    <th className="text-left px-4 py-3 font-semibold">Medecin</th>
-                    <th className="text-left px-4 py-3 font-semibold">Specialite</th>
-                    <th className="text-left px-4 py-3 font-semibold">Categorie</th>
-                    <th className="text-left px-4 py-3 font-semibold">Contact</th>
+                    <th className="text-left px-4 py-3">
+                      <SortButton columnKey="name" label="Medecin" />
+                    </th>
+                    <th className="text-left px-4 py-3">
+                      <SortButton columnKey="specialty" label="Specialite" />
+                    </th>
+                    <th className="text-left px-4 py-3">
+                      <SortButton columnKey="category" label="Categorie" />
+                    </th>
+                    <th className="text-left px-4 py-3">
+                      <SortButton columnKey="email" label="Contact" />
+                    </th>
                     <th className="text-left px-4 py-3 font-semibold">OpenIM</th>
                     <th className="text-left px-4 py-3 font-semibold">Actions</th>
                   </tr>

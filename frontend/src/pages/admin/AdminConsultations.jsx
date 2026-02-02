@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
-import { Calendar, Clock, ExternalLink, Loader2, MessageSquare, RefreshCw, Wallet } from 'lucide-react';
+import { Calendar, ChevronDown, ChevronUp, Clock, ExternalLink, Loader2, MessageSquare, RefreshCw, Wallet } from 'lucide-react';
 import { Button } from '../../components/ui/button';
+import { DataTableToolbar } from '../../components/DataTableToolbar';
 import { Pagination } from '../../components/Pagination';
 import { authHeaders, getToken, getUser } from '../../lib/auth';
 import { AdminLayout } from './AdminLayout';
@@ -86,7 +87,32 @@ export const AdminConsultations = () => {
   const [selectedIntakeId, setSelectedIntakeId] = useState(null);
   const [showCompleted, setShowCompleted] = useState(false);
   const [page, setPage] = useState(1);
-  const pageSize = 8;
+  const [pageSize, setPageSize] = useState(8);
+  const [query, setQuery] = useState('');
+  const [sortKey, setSortKey] = useState('created_at');
+  const [sortDir, setSortDir] = useState('desc');
+
+  const handleSort = (key) => {
+    if (sortKey === key) {
+      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  const SortButton = ({ columnKey, label }) => (
+    <button
+      type="button"
+      onClick={() => handleSort(columnKey)}
+      className="flex items-center gap-1 text-left text-sm font-semibold text-[#0A2540] hover:text-[#2ECC71]"
+    >
+      {label}
+      {sortKey === columnKey ? (
+        sortDir === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+      ) : null}
+    </button>
+  );
 
   const loadIntakes = async () => {
     setLoading(true);
@@ -133,24 +159,75 @@ export const AdminConsultations = () => {
   }, [navigate]);
 
   const filteredIntakes = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    const base = showCompleted ? intakes : intakes.filter((item) => item.status !== 'done');
+    if (!term) return base;
+    return base.filter((item) => {
+      const doctorName = item.assigned_doctor?.name || '';
+      return [
+        item.name,
+        item.email,
+        item.phone,
+        item.city,
+        item.category,
+        doctorName,
+        item.id
+      ]
+        .filter(Boolean)
+        .some((value) => value.toString().toLowerCase().includes(term));
+    });
+  }, [intakes, showCompleted, query]);
+
+  const sortedIntakes = useMemo(() => {
+    const getValue = (item) => {
+      switch (sortKey) {
+        case 'name':
+          return item.name || '';
+        case 'category':
+          return item.category || '';
+        case 'status':
+          return item.status || '';
+        case 'payment_status':
+          return item.payment_status || '';
+        case 'scheduled_at':
+          return item.scheduled_at || '';
+        case 'doctor':
+          return item.assigned_doctor?.name || '';
+        case 'created_at':
+        default:
+          return item.created_at || '';
+      }
+    };
+    return [...filteredIntakes].sort((a, b) => {
+      const aVal = getValue(a);
+      const bVal = getValue(b);
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredIntakes, sortKey, sortDir]);
     if (showCompleted) return intakes;
     return intakes.filter((item) => item.status !== 'done');
   }, [intakes, showCompleted]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredIntakes.length / pageSize));
-  const paginatedIntakes = filteredIntakes.slice((page - 1) * pageSize, page * pageSize);
+  const totalPages = Math.max(1, Math.ceil(sortedIntakes.length / pageSize));
+  const paginatedIntakes = sortedIntakes.slice((page - 1) * pageSize, page * pageSize);
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
   useEffect(() => {
-    if (!selectedIntakeId && filteredIntakes.length > 0) {
-      setSelectedIntakeId(filteredIntakes[0].id);
-    }
-  }, [filteredIntakes, selectedIntakeId]);
+    setPage(1);
+  }, [query, pageSize, showCompleted]);
 
-  const selectedIntake = filteredIntakes.find((item) => item.id === selectedIntakeId) || null;
+  useEffect(() => {
+    if (!selectedIntakeId && sortedIntakes.length > 0) {
+      setSelectedIntakeId(sortedIntakes[0].id);
+    }
+  }, [sortedIntakes, selectedIntakeId]);
+
+  const selectedIntake = sortedIntakes.find((item) => item.id === selectedIntakeId) || null;
 
   const handleScheduleChange = (id, value) => {
     setScheduleValues((prev) => ({ ...prev, [id]: value }));
@@ -298,21 +375,41 @@ export const AdminConsultations = () => {
             <Loader2 className="w-4 h-4 animate-spin text-[#2ECC71]" />
             Chargement des demandes...
           </div>
-        ) : filteredIntakes.length === 0 ? (
+        ) : sortedIntakes.length === 0 ? (
           <div className="text-sm text-[#64748B]">Aucune demande pour le moment.</div>
         ) : (
           <>
+            <DataTableToolbar
+              query={query}
+              onQueryChange={setQuery}
+              pageSize={pageSize}
+              onPageSizeChange={setPageSize}
+              totalCount={sortedIntakes.length}
+              label="demandes"
+            />
             <div className="overflow-auto border border-slate-200 rounded-2xl">
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-50 text-[#0A2540]">
                   <tr>
-                    <th className="text-left px-4 py-3 font-semibold">Patient</th>
-                    <th className="text-left px-4 py-3 font-semibold">Categorie</th>
+                    <th className="text-left px-4 py-3">
+                      <SortButton columnKey="name" label="Patient" />
+                    </th>
+                    <th className="text-left px-4 py-3">
+                      <SortButton columnKey="category" label="Categorie" />
+                    </th>
                     <th className="text-left px-4 py-3 font-semibold">Type</th>
-                    <th className="text-left px-4 py-3 font-semibold">Statut</th>
-                    <th className="text-left px-4 py-3 font-semibold">Paiement</th>
-                    <th className="text-left px-4 py-3 font-semibold">Planifie</th>
-                    <th className="text-left px-4 py-3 font-semibold">Medecin</th>
+                    <th className="text-left px-4 py-3">
+                      <SortButton columnKey="status" label="Statut" />
+                    </th>
+                    <th className="text-left px-4 py-3">
+                      <SortButton columnKey="payment_status" label="Paiement" />
+                    </th>
+                    <th className="text-left px-4 py-3">
+                      <SortButton columnKey="scheduled_at" label="Planifie" />
+                    </th>
+                    <th className="text-left px-4 py-3">
+                      <SortButton columnKey="doctor" label="Medecin" />
+                    </th>
                     <th className="text-left px-4 py-3 font-semibold">Actions</th>
                   </tr>
                 </thead>
