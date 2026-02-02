@@ -11,6 +11,7 @@ const OPENIM_WEB_URL = (process.env.REACT_APP_OPENIM_WEB_URL || 'http://localhos
 const OPENIM_API_URL = process.env.REACT_APP_OPENIM_API_URL || '';
 const OPENIM_CHAT_URL = process.env.REACT_APP_OPENIM_CHAT_URL || '';
 const OPENIM_WS_URL = process.env.REACT_APP_OPENIM_WS_URL || '';
+const OPENIM_PLATFORM_ID = Number(process.env.REACT_APP_OPENIM_PLATFORM_ID || 5);
 
 const encodePayload = (payload) => {
   const json = JSON.stringify(payload);
@@ -80,8 +81,10 @@ export const Messagerie = () => {
     }
     const payload = {
       imToken: openim.im_token,
+      token: openim.im_token,
       chatToken: openim.chat_token,
       userID: openim.user_id,
+      platformID: OPENIM_PLATFORM_ID,
     };
     if (OPENIM_API_URL) payload.apiUrl = OPENIM_API_URL;
     if (OPENIM_CHAT_URL) payload.chatUrl = OPENIM_CHAT_URL;
