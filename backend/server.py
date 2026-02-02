@@ -16,6 +16,7 @@ import asyncio
 import time
 import re
 import requests
+import subprocess
 from urllib.parse import quote
 from jose import jwt, JWTError
 from passlib.context import CryptContext
@@ -47,6 +48,7 @@ ADMIN_NAME = os.environ.get("ADMIN_NAME", "Admin Santia")
 ADMIN_PHONE = os.environ.get("ADMIN_PHONE", "")
 STANDARD_PAYMENT_AMOUNT = int(os.environ.get("STANDARD_PAYMENT_AMOUNT", "5000"))
 EXPRESS_PAYMENT_AMOUNT = int(os.environ.get("EXPRESS_PAYMENT_AMOUNT", "8000"))
+DEFAULT_DOCTOR_PASSWORD = os.environ.get("DEFAULT_DOCTOR_PASSWORD")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -169,6 +171,11 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 def hash_openim_password(password: str) -> str:
     return hashlib.md5(password.encode("utf-8")).hexdigest()
+
+def choose_doctor_password(existing_user: bool) -> Optional[str]:
+    if existing_user:
+        return DEFAULT_DOCTOR_PASSWORD
+    return DEFAULT_DOCTOR_PASSWORD or generate_temp_password()
 
 def create_access_token(subject: str, email: str, role: str) -> str:
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=AUTH_TOKEN_EXPIRE_MINUTES)
@@ -371,6 +378,213 @@ class OpenEMRClient:
         return {"patient_id": pid, "appointment_id": appt_id}
 
 openemr_client = OpenEMRClient()
+
+def openemr_db_params() -> Optional[dict]:
+    password = (
+        os.environ.get("OPENEMR_DB_PASSWORD")
+        or os.environ.get("OPENEMR_MYSQL_ROOT_PASSWORD")
+        or os.environ.get("OPENEMR_MYSQL_PASSWORD")
+    )
+    if not password:
+        return None
+    return {
+        "host": os.environ.get("OPENEMR_DB_HOST") or os.environ.get("OPENEMR_MYSQL_HOST") or "openemr-mysql",
+        "port": int(os.environ.get("OPENEMR_DB_PORT", "3306")),
+        "user": os.environ.get("OPENEMR_DB_USER", "root"),
+        "password": password,
+        "database": os.environ.get("OPENEMR_DB_NAME", "openemr"),
+    }
+
+def _openemr_connect():
+    params = openemr_db_params()
+    if not params:
+        raise RuntimeError("OpenEMR DB not configured")
+    import pymysql
+
+    return pymysql.connect(
+        host=params["host"],
+        port=params["port"],
+        user=params["user"],
+        password=params["password"],
+        database=params["database"],
+        cursorclass=pymysql.cursors.DictCursor,
+    )
+
+def _openemr_table_info(cursor, table: str) -> List[dict]:
+    cursor.execute(f"DESCRIBE `{table}`")
+    return cursor.fetchall()
+
+def _openemr_table_columns(info: List[dict]) -> List[str]:
+    return [row["Field"] for row in info]
+
+def _openemr_table_extras(info: List[dict]) -> dict:
+    return {row["Field"]: row.get("Extra", "") for row in info}
+
+def _openemr_table_types(info: List[dict]) -> dict:
+    return {row["Field"]: row.get("Type", "") for row in info}
+
+def _openemr_fetch_template(cursor, table: str, columns: List[str]) -> Optional[dict]:
+    name_col = "username" if "username" in columns else "id"
+    cursor.execute(f"SELECT * FROM `{table}` WHERE `{name_col}`='admin' LIMIT 1")
+    row = cursor.fetchone()
+    if row:
+        return row
+    cursor.execute(f"SELECT * FROM `{table}` LIMIT 1")
+    return cursor.fetchone()
+
+def _openemr_build_username(cursor, base: str) -> str:
+    candidate = re.sub(r"[^a-z0-9]+", "", (base or "").lower()) or "doctor"
+    suffix = 1
+    while True:
+        cursor.execute("SELECT 1 FROM `users` WHERE `username`=%s LIMIT 1", (candidate,))
+        if not cursor.fetchone():
+            return candidate
+        candidate = f"{candidate}{suffix}"
+        suffix += 1
+
+def _openemr_insert_row(cursor, table: str, row: dict) -> None:
+    columns = list(row.keys())
+    col_sql = ", ".join(f"`{col}`" for col in columns)
+    placeholders = ", ".join(["%s"] * len(columns))
+    cursor.execute(
+        f"INSERT INTO `{table}` ({col_sql}) VALUES ({placeholders})",
+        [row[col] for col in columns],
+    )
+
+def _openemr_ensure_group(cursor, username: str) -> None:
+    cursor.execute("SHOW TABLES LIKE 'groups'")
+    if not cursor.fetchone():
+        return
+    cursor.execute("DESCRIBE `groups`")
+    cols = [row["Field"] for row in cursor.fetchall()]
+    name_col = "name" if "name" in cols else ("groupname" if "groupname" in cols else None)
+    user_col = "user" if "user" in cols else ("username" if "username" in cols else ("user_id" if "user_id" in cols else None))
+    if not name_col or not user_col:
+        return
+    cursor.execute(
+        f"SELECT 1 FROM `groups` WHERE `{name_col}`=%s AND `{user_col}`=%s LIMIT 1",
+        ("Default", username),
+    )
+    if cursor.fetchone():
+        return
+    _openemr_insert_row(cursor, "groups", {name_col: "Default", user_col: username})
+
+def _openemr_enable_globals(cursor) -> None:
+    cursor.execute("SHOW TABLES LIKE 'globals'")
+    if not cursor.fetchone():
+        return
+    globals_to_enable = {
+        "rest_api": "1",
+        "rest_fhir_api": "1",
+        "rest_portal_api": "1",
+        "portal_onsite_two_enable": "1",
+    }
+    portal_addr = os.environ.get("OPENEMR_SITE_ADDR") or os.environ.get("OPENEMR_REDIRECT_URI")
+    if portal_addr:
+        globals_to_enable["portal_onsite_two_address"] = portal_addr
+    for key, value in globals_to_enable.items():
+        cursor.execute("SELECT 1 FROM `globals` WHERE `gl_name`=%s LIMIT 1", (key,))
+        if cursor.fetchone():
+            cursor.execute("UPDATE `globals` SET `gl_value`=%s WHERE `gl_name`=%s", (value, key))
+        else:
+            cursor.execute("INSERT INTO `globals` (`gl_name`, `gl_value`) VALUES (%s, %s)", (key, value))
+
+def _openemr_enable_modules(cursor) -> None:
+    cursor.execute("SHOW TABLES LIKE 'modules'")
+    if not cursor.fetchone():
+        return
+    cursor.execute("DESCRIBE `modules`")
+    cols = [row["Field"] for row in cursor.fetchall()]
+    name_col = "mod_name" if "mod_name" in cols else ("name" if "name" in cols else None)
+    active_col = "mod_active" if "mod_active" in cols else ("active" if "active" in cols else None)
+    if not name_col or not active_col:
+        return
+    for module_name in ("telehealth", "patient_portal", "portal", "calendar"):
+        cursor.execute(
+            f"SELECT 1 FROM `modules` WHERE `{name_col}`=%s LIMIT 1",
+            (module_name,),
+        )
+        if cursor.fetchone():
+            cursor.execute(
+                f"UPDATE `modules` SET `{active_col}`=1 WHERE `{name_col}`=%s",
+                (module_name,),
+            )
+
+def provision_openemr_user_sync(doctor: dict, password: str) -> Optional[tuple[str, bool]]:
+    params = openemr_db_params()
+    if not params:
+        return None
+    conn = _openemr_connect()
+    try:
+        cursor = conn.cursor()
+        _openemr_enable_globals(cursor)
+        _openemr_enable_modules(cursor)
+        user_info = _openemr_table_info(cursor, "users")
+        secure_info = _openemr_table_info(cursor, "users_secure")
+        user_columns = _openemr_table_columns(user_info)
+        secure_columns = _openemr_table_columns(secure_info)
+        user_extras = _openemr_table_extras(user_info)
+        user_types = _openemr_table_types(user_info)
+        id_auto = "auto_increment" in user_extras.get("id", "")
+
+        email = (doctor.get("email") or "").lower()
+        base = email.split("@")[0] if email else doctor.get("name", "doctor")
+        preferred = doctor.get("openemr_provider_id") or base
+        username = _openemr_build_username(cursor, preferred)
+
+        cursor.execute("SELECT * FROM `users` WHERE `username`=%s LIMIT 1", (username,))
+        existing = cursor.fetchone()
+        if existing:
+            conn.commit()
+            return (str(existing.get("id") or username), False)
+
+        template_user = _openemr_fetch_template(cursor, "users", user_columns)
+        template_secure = _openemr_fetch_template(cursor, "users_secure", secure_columns)
+        if not template_user or not template_secure:
+            return None
+
+        name_parts = split_name(doctor.get("name", ""))
+        user_row = dict(template_user)
+        if "username" in user_row:
+            user_row["username"] = username
+        for field, value in {
+            "fname": name_parts["fname"],
+            "mname": name_parts["mname"],
+            "lname": name_parts["lname"],
+            "email": email or template_user.get("email"),
+            "phone": doctor.get("phone") or template_user.get("phone"),
+            "authorized": 1,
+            "active": 1,
+            "calendar": 1,
+            "info": "Medecin Santia",
+        }.items():
+            if field in user_row:
+                user_row[field] = value
+        if "uuid" in user_row:
+            uuid_type = (user_types.get("uuid") or "").lower()
+            new_uuid = uuid.uuid4()
+            user_row["uuid"] = new_uuid.bytes if "binary" in uuid_type else str(new_uuid)
+        if id_auto and "id" in user_row:
+            user_row.pop("id", None)
+        _openemr_insert_row(cursor, "users", user_row)
+        user_id = cursor.lastrowid
+
+        secure_row = dict(template_secure)
+        secure_row["id"] = user_id
+        if "username" in secure_row:
+            secure_row["username"] = username
+        if "password" in secure_row:
+            secure_row["password"] = pwd_context.hash(password)
+        if "salt" in secure_row:
+            secure_row["salt"] = ""
+        if "last_update" in secure_row:
+            secure_row["last_update"] = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        _openemr_insert_row(cursor, "users_secure", secure_row)
+        _openemr_ensure_group(cursor, username)
+        conn.commit()
+        return (str(user_id), True)
+    finally:
+        conn.close()
 
 class OpenIMClient:
     def __init__(self) -> None:
@@ -644,6 +858,10 @@ class DoctorResponse(BaseModel):
 class DoctorCreateResponse(DoctorResponse):
     openim_password: Optional[str] = None
     openim_created: bool = False
+    santia_password: Optional[str] = None
+    santia_created: bool = False
+    openemr_password: Optional[str] = None
+    openemr_created: bool = False
 
 class DoctorPublicResponse(BaseModel):
     id: str
@@ -714,6 +932,20 @@ class IntakeAssignDoctor(BaseModel):
 
 class IntakePaymentUpdate(BaseModel):
     status: Literal["pending", "confirmed", "rejected"]
+
+class AdminMetricsResponse(BaseModel):
+    totals: dict
+    payments: dict
+    statuses: dict
+    types: dict
+    recent: dict
+    categories: List[dict]
+    doctors: List[dict]
+
+class ProvisionDoctorsResponse(BaseModel):
+    status: str
+    message: Optional[str] = None
+    csv: Optional[str] = None
 
 # Add your routes to the router instead of directly to app
 @api_router.get("/")
@@ -955,6 +1187,121 @@ async def get_patients(_: dict = Depends(require_admin)):
     )
     return [UserResponse(**sanitize_user(user)) for user in patients]
 
+@api_router.get("/admin/metrics", response_model=AdminMetricsResponse)
+async def get_admin_metrics(_: dict = Depends(require_admin)):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Base de donnees indisponible")
+
+    intakes = await db.intakes.find({}, {"_id": 0}).to_list(5000)
+    doctors = await db.doctors.find({}, {"_id": 0}).to_list(1000)
+
+    status_counts = {"pending": 0, "scheduled": 0, "done": 0}
+    type_counts = {"standard": 0, "express": 0}
+    payment_counts = {"pending": 0, "confirmed": 0, "rejected": 0}
+    payment_total_confirmed = 0
+    category_counts = {}
+    doctor_counts = {}
+    now = datetime.now(timezone.utc)
+    last7 = 0
+    last30 = 0
+
+    for intake in intakes:
+        status = intake.get("status", "pending")
+        status_counts[status] = status_counts.get(status, 0) + 1
+        ctype = intake.get("consultation_type") or "standard"
+        type_counts[ctype] = type_counts.get(ctype, 0) + 1
+        pstatus = intake.get("payment_status") or "pending"
+        payment_counts[pstatus] = payment_counts.get(pstatus, 0) + 1
+        if pstatus == "confirmed":
+            payment_total_confirmed += int(intake.get("payment_amount") or 0)
+        category = intake.get("category") or "generale"
+        category_counts[category] = category_counts.get(category, 0) + 1
+        doctor_id = intake.get("assigned_doctor_id")
+        if doctor_id:
+            doctor_counts[doctor_id] = doctor_counts.get(doctor_id, 0) + 1
+
+        created_at_raw = intake.get("created_at")
+        if created_at_raw:
+            try:
+                created_at = datetime.fromisoformat(created_at_raw.replace("Z", "+00:00"))
+                if created_at.tzinfo is None:
+                    created_at = created_at.replace(tzinfo=timezone.utc)
+                delta = now - created_at
+                if delta <= timedelta(days=7):
+                    last7 += 1
+                if delta <= timedelta(days=30):
+                    last30 += 1
+            except ValueError:
+                pass
+
+    doctor_lookup = {doc.get("id"): doc.get("name", "") for doc in doctors}
+    top_categories = sorted(
+        [{"category": key, "count": value} for key, value in category_counts.items()],
+        key=lambda x: x["count"],
+        reverse=True,
+    )[:8]
+    top_doctors = sorted(
+        [
+            {
+                "doctor_id": doctor_id,
+                "doctor_name": doctor_lookup.get(doctor_id, "Inconnu"),
+                "count": count,
+            }
+            for doctor_id, count in doctor_counts.items()
+        ],
+        key=lambda x: x["count"],
+        reverse=True,
+    )[:8]
+
+    return AdminMetricsResponse(
+        totals={
+            "requests": len(intakes),
+            "doctors": len(doctors),
+            "patients": await db.users.count_documents({"role": "patient"}),
+        },
+        payments={
+            "confirmed_amount": payment_total_confirmed,
+            "pending": payment_counts.get("pending", 0),
+            "confirmed": payment_counts.get("confirmed", 0),
+            "rejected": payment_counts.get("rejected", 0),
+        },
+        statuses=status_counts,
+        types=type_counts,
+        recent={"last7": last7, "last30": last30},
+        categories=top_categories,
+        doctors=top_doctors,
+    )
+
+@api_router.post("/admin/provision-doctors", response_model=ProvisionDoctorsResponse)
+async def provision_doctors(_: dict = Depends(require_admin)):
+    output_path = "/tmp/doctor_accounts.csv"
+    try:
+        result = await asyncio.to_thread(
+            subprocess.run,
+            ["python", "/app/scripts/provision_doctors.py", "--output", output_path],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Erreur provisionnement: {exc}") from exc
+
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip() or "Erreur de provisionnement"
+        raise HTTPException(status_code=500, detail=detail)
+
+    csv_content = None
+    try:
+        csv_content = Path(output_path).read_text(encoding="utf-8")
+    except Exception:
+        csv_content = None
+
+    return ProvisionDoctorsResponse(
+        status="ok",
+        message=result.stdout.strip() or "Provisionnement termine.",
+        csv=csv_content,
+    )
+
 @api_router.patch("/patients/{patient_id}", response_model=UserResponse)
 async def update_patient(patient_id: str, input: PatientUpdate, _: dict = Depends(require_admin)):
     if db is None:
@@ -1031,27 +1378,32 @@ async def pick_doctor_for_category(category: str) -> Optional[dict]:
 
 async def create_doctor_record(input: DoctorCreate) -> DoctorCreateResponse:
     email = input.email.lower()
+    existing_user = None
+    if db is not None:
+        existing_user = await db.users.find_one({"email": email}, {"_id": 0})
+        if existing_user and existing_user.get("role") != "doctor":
+            raise HTTPException(status_code=400, detail="Email deja utilise par un patient")
     doctor_id = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
     openemr_provider_id = input.openemr_provider_id.strip() if input.openemr_provider_id else None
     category = (input.category or "generale").strip() or "generale"
+    doctor_password = choose_doctor_password(existing_user is not None)
     openim_user_id = None
     openim_password = None
     openim_created = False
 
-    if openim_client.can_register():
-        temp_password = generate_temp_password()
+    if doctor_password and openim_client.can_register():
         try:
             openim_payload = await asyncio.to_thread(
                 openim_client.register_user,
                 input.name.strip(),
                 email,
-                temp_password,
+                doctor_password,
             )
             openim_tokens = build_openim_tokens(openim_payload)
             if openim_tokens:
                 openim_user_id = openim_tokens.user_id
-                openim_password = temp_password
+                openim_password = doctor_password
                 openim_created = True
         except OpenIMError as exc:
             logger.warning("OpenIM doctor register failed: %s", exc)
@@ -1068,10 +1420,69 @@ async def create_doctor_record(input: DoctorCreate) -> DoctorCreateResponse:
         "created_at": created_at,
     }
     await db.doctors.insert_one(doctor_doc)
+    santia_user_id = None
+    santia_created = False
+    santia_password = None
+    if db is not None:
+        if existing_user:
+            santia_user_id = existing_user.get("id")
+            await db.users.update_one(
+                {"id": santia_user_id},
+                {"$set": {
+                    "doctor_id": doctor_id,
+                    "phone": input.phone.strip(),
+                    "name": input.name.strip(),
+                    "openim_user_id": openim_user_id or existing_user.get("openim_user_id"),
+                }},
+            )
+        elif doctor_password:
+            santia_user_id = str(uuid.uuid4())
+            await db.users.insert_one({
+                "id": santia_user_id,
+                "name": input.name.strip(),
+                "email": email,
+                "phone": input.phone.strip(),
+                "password_hash": hash_password(doctor_password),
+                "openim_password_hash": hash_openim_password(doctor_password),
+                "role": "doctor",
+                "doctor_id": doctor_id,
+                "created_at": created_at,
+                "openim_user_id": openim_user_id,
+            })
+            santia_created = True
+            santia_password = doctor_password
+
+    openemr_created = False
+    openemr_password = None
+    if not openemr_provider_id and doctor_password and openemr_db_params():
+        try:
+            result = await asyncio.to_thread(provision_openemr_user_sync, doctor_doc, doctor_password)
+            if result:
+                openemr_provider_id, openemr_created = result
+                if openemr_provider_id:
+                    await db.doctors.update_one(
+                        {"id": doctor_id},
+                        {"$set": {"openemr_provider_id": openemr_provider_id}},
+                    )
+                    doctor_doc["openemr_provider_id"] = openemr_provider_id
+                if openemr_created:
+                    openemr_password = doctor_password
+        except Exception as exc:
+            logger.warning("OpenEMR doctor provision failed: %s", exc)
+
+    if santia_user_id:
+        await db.doctors.update_one(
+            {"id": doctor_id},
+            {"$set": {"santia_user_id": santia_user_id}},
+        )
     return DoctorCreateResponse(
         **doctor_doc,
         openim_password=openim_password,
         openim_created=openim_created,
+        santia_password=santia_password,
+        santia_created=santia_created,
+        openemr_password=openemr_password,
+        openemr_created=openemr_created,
     )
 
 @api_router.post("/doctors", response_model=DoctorCreateResponse)
@@ -1082,6 +1493,9 @@ async def create_doctor(input: DoctorCreate, _: dict = Depends(require_admin)):
     existing = await db.doctors.find_one({"email": email})
     if existing:
         raise HTTPException(status_code=400, detail="Email deja utilise")
+    user_conflict = await db.users.find_one({"email": email}, {"_id": 0})
+    if user_conflict and user_conflict.get("role") != "doctor":
+        raise HTTPException(status_code=400, detail="Email deja utilise par un patient")
     return await create_doctor_record(input)
 
 def default_doctor_samples_by_category() -> dict:

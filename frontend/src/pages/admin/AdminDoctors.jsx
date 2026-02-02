@@ -53,6 +53,8 @@ export const AdminDoctors = () => {
   const [seedLoading, setSeedLoading] = useState(false);
   const [seedMessage, setSeedMessage] = useState('');
   const [seedDetails, setSeedDetails] = useState([]);
+  const [provisionLoading, setProvisionLoading] = useState(false);
+  const [provisionMessage, setProvisionMessage] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(8);
   const [query, setQuery] = useState('');
@@ -138,7 +140,15 @@ export const AdminDoctors = () => {
     setDoctorSuccess('');
     try {
       const response = await axios.post(`${API_URL}/api/doctors`, doctorForm, { headers: authHeaders() });
-      const { openim_password, openim_created, ...doctor } = response.data || {};
+      const {
+        openim_password,
+        openim_created,
+        santia_password,
+        santia_created,
+        openemr_password,
+        openemr_created,
+        ...doctor
+      } = response.data || {};
       setDoctors((prev) => [doctor, ...prev]);
       setDoctorForm({
         name: '',
@@ -148,10 +158,14 @@ export const AdminDoctors = () => {
         category: 'generale',
         openemr_provider_id: ''
       });
-      if (openim_created && openim_password) {
-        setDoctorSuccess(`Medecin cree. Mot de passe OpenIM: ${openim_password}`);
+      const credentials = [];
+      if (santia_created && santia_password) credentials.push(`Santia: ${santia_password}`);
+      if (openim_created && openim_password) credentials.push(`OpenIM: ${openim_password}`);
+      if (openemr_created && openemr_password) credentials.push(`OpenEMR: ${openemr_password}`);
+      if (credentials.length) {
+        setDoctorSuccess(`Medecin cree. Identifiants: ${credentials.join(' | ')}`);
       } else {
-        setDoctorSuccess('Medecin cree. OpenIM sera connecte plus tard.');
+        setDoctorSuccess('Medecin cree. Les comptes seront finalises plus tard.');
       }
     } catch (err) {
       setDoctorError('Impossible de creer le medecin.');
@@ -176,7 +190,11 @@ export const AdminDoctors = () => {
           name: doctor.name,
           email: doctor.email,
           openim_password: doctor.openim_password,
-          openim_created: doctor.openim_created
+          openim_created: doctor.openim_created,
+          santia_password: doctor.santia_password,
+          santia_created: doctor.santia_created,
+          openemr_password: doctor.openemr_password,
+          openemr_created: doctor.openemr_created
         }))
       );
       const createdLabel = created.length
@@ -189,6 +207,35 @@ export const AdminDoctors = () => {
       setDoctorError('Impossible d ajouter les medecins tests.');
     } finally {
       setSeedLoading(false);
+    }
+  };
+
+  const handleProvisionDoctors = async () => {
+    setProvisionLoading(true);
+    setDoctorError('');
+    setDoctorSuccess('');
+    setProvisionMessage('');
+    try {
+      const response = await axios.post(`${API_URL}/api/admin/provision-doctors`, {}, { headers: authHeaders() });
+      const message = response.data?.message || 'Provisionnement termine.';
+      setProvisionMessage(message);
+      const csv = response.data?.csv;
+      if (csv) {
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', 'doctor_accounts.csv');
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+      }
+      await loadDoctors();
+    } catch (err) {
+      setDoctorError(err.response?.data?.detail || 'Impossible de provisionner les medecins.');
+    } finally {
+      setProvisionLoading(false);
     }
   };
 
@@ -325,6 +372,10 @@ export const AdminDoctors = () => {
             <RefreshCw className="w-4 h-4" />
             Rafraichir
           </Button>
+          <Button onClick={handleProvisionDoctors} variant="outline" className="flex items-center gap-2" disabled={provisionLoading}>
+            <UserPlus className="w-4 h-4" />
+            {provisionLoading ? 'Provision...' : 'Provisionner medecins'}
+          </Button>
           <Button onClick={handleSeedDoctors} variant="outline" className="flex items-center gap-2" disabled={seedLoading}>
             <UserPlus className="w-4 h-4" />
             {seedLoading ? 'Ajout en cours...' : 'Ajouter des medecins tests'}
@@ -352,13 +403,25 @@ export const AdminDoctors = () => {
               {seedDetails.map((doctor) => (
                 <div key={doctor.id}>
                   Dr {doctor.name} · {doctor.email}
+                  {doctor.santia_created && doctor.santia_password
+                    ? ` · Mdp Santia: ${doctor.santia_password}`
+                    : ''}
                   {doctor.openim_created && doctor.openim_password
                     ? ` · Mdp OpenIM: ${doctor.openim_password}`
                     : ' · OpenIM non lie'}
+                  {doctor.openemr_created && doctor.openemr_password
+                    ? ` · Mdp OpenEMR: ${doctor.openemr_password}`
+                    : ''}
                 </div>
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {provisionMessage && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-6 text-sm text-emerald-700">
+          {provisionMessage}
         </div>
       )}
 

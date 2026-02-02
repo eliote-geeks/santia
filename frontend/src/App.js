@@ -5,6 +5,7 @@ import { Consultation } from "./pages/Consultation";
 import { Confirmation } from "./pages/Confirmation";
 import { PatientProfile } from "./pages/PatientProfile";
 import { AdminConsultations } from "./pages/admin/AdminConsultations";
+import { AdminDashboard } from "./pages/admin/AdminDashboard";
 import { AdminDoctors } from "./pages/admin/AdminDoctors";
 import { AdminPatients } from "./pages/admin/AdminPatients";
 import { Login } from "./pages/Login";
@@ -26,7 +27,8 @@ function App() {
           <Route path="/dossier" element={<PatientProfile />} />
           <Route path="/dossier/:id" element={<PatientProfile />} />
           <Route path="/messagerie" element={<Messagerie />} />
-          <Route path="/admin" element={<AdminConsultations />} />
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route path="/admin/consultations" element={<AdminConsultations />} />
           <Route path="/admin/doctors" element={<AdminDoctors />} />
           <Route path="/admin/patients" element={<AdminPatients />} />

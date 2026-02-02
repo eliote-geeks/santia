@@ -3,6 +3,7 @@ import { Navbar } from '../../components/Navbar';
 import { Footer } from '../../components/Footer';
 
 const tabs = [
+  { to: '/admin/dashboard', label: 'Dashboard' },
   { to: '/admin/consultations', label: 'Consultations' },
   { to: '/admin/doctors', label: 'Medecins' },
   { to: '/admin/patients', label: 'Patients' }
