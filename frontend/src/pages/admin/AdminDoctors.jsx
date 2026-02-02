@@ -58,6 +58,18 @@ export const AdminDoctors = () => {
   const [query, setQuery] = useState('');
   const [sortKey, setSortKey] = useState('created_at');
   const [sortDir, setSortDir] = useState('desc');
+  const [selectedDoctorId, setSelectedDoctorId] = useState(null);
+  const [editMode, setEditMode] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    specialty: '',
+    category: 'generale',
+    openemr_provider_id: ''
+  });
+  const [savingId, setSavingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   const handleSort = (key) => {
     if (sortKey === key) {
@@ -235,6 +247,73 @@ export const AdminDoctors = () => {
   useEffect(() => {
     setPage(1);
   }, [query, pageSize]);
+
+  const selectedDoctor = sortedDoctors.find((doctor) => doctor.id === selectedDoctorId) || null;
+
+  useEffect(() => {
+    if (!selectedDoctorId && sortedDoctors.length > 0) {
+      setSelectedDoctorId(sortedDoctors[0].id);
+    }
+  }, [sortedDoctors, selectedDoctorId]);
+
+  useEffect(() => {
+    if (selectedDoctor) {
+      setEditForm({
+        name: selectedDoctor.name || '',
+        email: selectedDoctor.email || '',
+        phone: selectedDoctor.phone || '',
+        specialty: selectedDoctor.specialty || '',
+        category: selectedDoctor.category || 'generale',
+        openemr_provider_id: selectedDoctor.openemr_provider_id || ''
+      });
+    }
+  }, [selectedDoctor]);
+
+  const handleEditChange = (field, value) => {
+    setEditForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleUpdateDoctor = async () => {
+    if (!selectedDoctor) return;
+    setSavingId(selectedDoctor.id);
+    setDoctorError('');
+    setDoctorSuccess('');
+    try {
+      const response = await axios.patch(
+        `${API_URL}/api/doctors/${selectedDoctor.id}`,
+        editForm,
+        { headers: authHeaders() }
+      );
+      setDoctors((prev) => prev.map((doc) => (doc.id === selectedDoctor.id ? response.data : doc)));
+      setDoctorSuccess('Medecin mis a jour.');
+      setEditMode(false);
+    } catch (err) {
+      setDoctorError(err.response?.data?.detail || 'Impossible de mettre a jour le medecin.');
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const handleDeleteDoctor = async (doctorId) => {
+    const confirmDelete = window.confirm('Confirmer la suppression de ce medecin ?');
+    if (!confirmDelete) return;
+    setDeletingId(doctorId);
+    setDoctorError('');
+    setDoctorSuccess('');
+    try {
+      await axios.delete(`${API_URL}/api/doctors/${doctorId}`, { headers: authHeaders() });
+      setDoctors((prev) => prev.filter((doc) => doc.id !== doctorId));
+      if (selectedDoctorId === doctorId) {
+        setSelectedDoctorId(null);
+        setEditMode(false);
+      }
+      setDoctorSuccess('Medecin supprime.');
+    } catch (err) {
+      setDoctorError(err.response?.data?.detail || 'Impossible de supprimer le medecin.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <AdminLayout
@@ -422,6 +501,33 @@ export const AdminDoctors = () => {
                           <Button variant="outline" className="px-3 py-2 text-xs" onClick={() => copyToClipboard(doctor.phone)}>
                             Copier tel
                           </Button>
+                          <Button
+                            variant="outline"
+                            className="px-3 py-2 text-xs"
+                            onClick={() => {
+                              setSelectedDoctorId(doctor.id);
+                              setEditMode(false);
+                            }}
+                          >
+                            Details
+                          </Button>
+                          <Button
+                            className="btn-green px-3 py-2 text-xs"
+                            onClick={() => {
+                              setSelectedDoctorId(doctor.id);
+                              setEditMode(true);
+                            }}
+                          >
+                            Editer
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="px-3 py-2 text-xs"
+                            onClick={() => handleDeleteDoctor(doctor.id)}
+                            disabled={deletingId === doctor.id}
+                          >
+                            {deletingId === doctor.id ? 'Suppression...' : 'Supprimer'}
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -433,6 +539,123 @@ export const AdminDoctors = () => {
           </>
         )}
       </div>
+
+      {selectedDoctor && (
+        <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 mt-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+            <div>
+              <h3 className="text-xl font-semibold text-[#0A2540]">Details medecin</h3>
+              <p className="text-sm text-[#64748B]">Dr {selectedDoctor.name}</p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="px-4 py-2"
+                onClick={() => setEditMode((prev) => !prev)}
+              >
+                {editMode ? 'Annuler' : 'Modifier'}
+              </Button>
+            </div>
+          </div>
+
+          {editMode ? (
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-[#0A2540]">Nom complet</label>
+                <input
+                  type="text"
+                  className="input-santia"
+                  value={editForm.name}
+                  onChange={(event) => handleEditChange('name', event.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-[#0A2540]">Email</label>
+                <input
+                  type="email"
+                  className="input-santia"
+                  value={editForm.email}
+                  onChange={(event) => handleEditChange('email', event.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-[#0A2540]">Telephone</label>
+                <input
+                  type="text"
+                  className="input-santia"
+                  value={editForm.phone}
+                  onChange={(event) => handleEditChange('phone', event.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-[#0A2540]">Specialite</label>
+                <input
+                  type="text"
+                  className="input-santia"
+                  value={editForm.specialty}
+                  onChange={(event) => handleEditChange('specialty', event.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-[#0A2540]">Categorie</label>
+                <select
+                  className="input-santia"
+                  value={editForm.category}
+                  onChange={(event) => handleEditChange('category', event.target.value)}
+                >
+                  {doctorCategories.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-[#0A2540]">ID OpenEMR</label>
+                <input
+                  type="text"
+                  className="input-santia"
+                  value={editForm.openemr_provider_id}
+                  onChange={(event) => handleEditChange('openemr_provider_id', event.target.value)}
+                />
+              </div>
+              <div className="md:col-span-2 flex flex-wrap gap-3">
+                <Button
+                  className="btn-green px-6 py-3"
+                  onClick={handleUpdateDoctor}
+                  disabled={savingId === selectedDoctor.id}
+                >
+                  {savingId === selectedDoctor.id ? 'Sauvegarde...' : 'Enregistrer'}
+                </Button>
+                <Button variant="outline" className="px-6 py-3" onClick={() => setEditMode(false)}>
+                  Annuler
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 gap-4 text-sm text-[#64748B]">
+              <div>
+                <p className="text-xs uppercase text-[#94A3B8] mb-1">Contact</p>
+                <p className="font-semibold text-[#0A2540]">{selectedDoctor.email}</p>
+                <p>{selectedDoctor.phone}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase text-[#94A3B8] mb-1">Specialite</p>
+                <p className="font-semibold text-[#0A2540]">{selectedDoctor.specialty}</p>
+                <p>{categoryLabels[selectedDoctor.category] || selectedDoctor.category}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase text-[#94A3B8] mb-1">OpenIM</p>
+                <p>{selectedDoctor.openim_user_id ? 'Actif' : 'Non lie'}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase text-[#94A3B8] mb-1">OpenEMR</p>
+                <p>{selectedDoctor.openemr_provider_id || '—'}</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </AdminLayout>
   );
 };

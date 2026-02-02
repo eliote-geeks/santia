@@ -564,6 +564,11 @@ class UserResponse(BaseModel):
     role: str
     created_at: str
 
+class PatientUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+
 class OpenIMTokens(BaseModel):
     im_token: str
     chat_token: str
@@ -613,6 +618,14 @@ class DoctorCreate(BaseModel):
     phone: str
     specialty: str
     category: str = "generale"
+    openemr_provider_id: Optional[str] = None
+
+class DoctorUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    specialty: Optional[str] = None
+    category: Optional[str] = None
     openemr_provider_id: Optional[str] = None
 
 class DoctorResponse(BaseModel):
@@ -878,6 +891,40 @@ async def get_doctors(_: dict = Depends(require_admin)):
     )
     return doctors
 
+@api_router.patch("/doctors/{doctor_id}", response_model=DoctorResponse)
+async def update_doctor(doctor_id: str, input: DoctorUpdate, _: dict = Depends(require_admin)):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Base de donnees indisponible")
+    update_fields = {k: v for k, v in input.model_dump(exclude_none=True).items()}
+    if not update_fields:
+        doctor = await db.doctors.find_one({"id": doctor_id}, {"_id": 0})
+        if not doctor:
+            raise HTTPException(status_code=404, detail="Medecin introuvable")
+        return doctor
+    if "email" in update_fields:
+        email = update_fields["email"].lower()
+        existing = await db.doctors.find_one({"email": email, "id": {"$ne": doctor_id}}, {"_id": 1})
+        if existing:
+            raise HTTPException(status_code=400, detail="Email deja utilise")
+        update_fields["email"] = email
+    await db.doctors.update_one({"id": doctor_id}, {"$set": update_fields})
+    doctor = await db.doctors.find_one({"id": doctor_id}, {"_id": 0})
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Medecin introuvable")
+    return doctor
+
+@api_router.delete("/doctors/{doctor_id}")
+async def delete_doctor(doctor_id: str, _: dict = Depends(require_admin)):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Base de donnees indisponible")
+    assigned_count = await db.intakes.count_documents({"assigned_doctor_id": doctor_id})
+    if assigned_count > 0:
+        raise HTTPException(status_code=409, detail="Ce medecin est assigne a des consultations")
+    result = await db.doctors.delete_one({"id": doctor_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Medecin introuvable")
+    return {"status": "deleted"}
+
 @api_router.get("/doctors/public", response_model=List[DoctorPublicResponse])
 async def get_public_doctors(category: Optional[str] = None):
     if db is None:
@@ -907,6 +954,40 @@ async def get_patients(_: dict = Depends(require_admin)):
         .to_list(1000)
     )
     return [UserResponse(**sanitize_user(user)) for user in patients]
+
+@api_router.patch("/patients/{patient_id}", response_model=UserResponse)
+async def update_patient(patient_id: str, input: PatientUpdate, _: dict = Depends(require_admin)):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Base de donnees indisponible")
+    update_fields = {k: v for k, v in input.model_dump(exclude_none=True).items()}
+    if not update_fields:
+        user = await db.users.find_one({"id": patient_id}, {"_id": 0})
+        if not user:
+            raise HTTPException(status_code=404, detail="Patient introuvable")
+        return UserResponse(**sanitize_user(user))
+    if "email" in update_fields:
+        email = update_fields["email"].lower()
+        existing = await db.users.find_one({"email": email, "id": {"$ne": patient_id}}, {"_id": 1})
+        if existing:
+            raise HTTPException(status_code=400, detail="Email deja utilise")
+        update_fields["email"] = email
+    await db.users.update_one({"id": patient_id}, {"$set": update_fields})
+    user = await db.users.find_one({"id": patient_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="Patient introuvable")
+    return UserResponse(**sanitize_user(user))
+
+@api_router.delete("/patients/{patient_id}")
+async def delete_patient(patient_id: str, _: dict = Depends(require_admin)):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Base de donnees indisponible")
+    intake_count = await db.intakes.count_documents({"user_id": patient_id})
+    if intake_count > 0:
+        raise HTTPException(status_code=409, detail="Ce patient a deja des consultations")
+    result = await db.users.delete_one({"id": patient_id, "role": "patient"})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Patient introuvable")
+    return {"status": "deleted"}
 
 async def fetch_doctors_for_category(category: Optional[str]) -> List[dict]:
     if db is None:

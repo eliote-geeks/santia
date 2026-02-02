@@ -40,6 +40,11 @@ export const AdminPatients = () => {
   const [query, setQuery] = useState('');
   const [sortKey, setSortKey] = useState('created_at');
   const [sortDir, setSortDir] = useState('desc');
+  const [selectedPatientId, setSelectedPatientId] = useState(null);
+  const [editMode, setEditMode] = useState(false);
+  const [editForm, setEditForm] = useState({ name: '', email: '', phone: '' });
+  const [savingId, setSavingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   const handleSort = (key) => {
     if (sortKey === key) {
@@ -142,6 +147,66 @@ export const AdminPatients = () => {
     setPage(1);
   }, [query, pageSize]);
 
+  const selectedPatient = sortedPatients.find((patient) => patient.id === selectedPatientId) || null;
+
+  useEffect(() => {
+    if (!selectedPatientId && sortedPatients.length > 0) {
+      setSelectedPatientId(sortedPatients[0].id);
+    }
+  }, [sortedPatients, selectedPatientId]);
+
+  useEffect(() => {
+    if (selectedPatient) {
+      setEditForm({
+        name: selectedPatient.name || '',
+        email: selectedPatient.email || '',
+        phone: selectedPatient.phone || ''
+      });
+    }
+  }, [selectedPatient]);
+
+  const handleEditChange = (field, value) => {
+    setEditForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleUpdatePatient = async () => {
+    if (!selectedPatient) return;
+    setSavingId(selectedPatient.id);
+    setPatientError('');
+    try {
+      const response = await axios.patch(
+        `${API_URL}/api/patients/${selectedPatient.id}`,
+        editForm,
+        { headers: authHeaders() }
+      );
+      setPatients((prev) => prev.map((item) => (item.id === selectedPatient.id ? response.data : item)));
+      setEditMode(false);
+    } catch (err) {
+      setPatientError(err.response?.data?.detail || 'Impossible de mettre a jour le patient.');
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const handleDeletePatient = async (patientId) => {
+    const confirmDelete = window.confirm('Confirmer la suppression de ce patient ?');
+    if (!confirmDelete) return;
+    setDeletingId(patientId);
+    setPatientError('');
+    try {
+      await axios.delete(`${API_URL}/api/patients/${patientId}`, { headers: authHeaders() });
+      setPatients((prev) => prev.filter((item) => item.id !== patientId));
+      if (selectedPatientId === patientId) {
+        setSelectedPatientId(null);
+        setEditMode(false);
+      }
+    } catch (err) {
+      setPatientError(err.response?.data?.detail || 'Impossible de supprimer le patient.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <AdminLayout
       title="Patients inscrits"
@@ -216,6 +281,33 @@ export const AdminPatients = () => {
                           <Button variant="outline" className="px-3 py-2 text-xs" onClick={() => copyToClipboard(patient.phone)}>
                             Copier tel
                           </Button>
+                          <Button
+                            variant="outline"
+                            className="px-3 py-2 text-xs"
+                            onClick={() => {
+                              setSelectedPatientId(patient.id);
+                              setEditMode(false);
+                            }}
+                          >
+                            Details
+                          </Button>
+                          <Button
+                            className="btn-green px-3 py-2 text-xs"
+                            onClick={() => {
+                              setSelectedPatientId(patient.id);
+                              setEditMode(true);
+                            }}
+                          >
+                            Editer
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="px-3 py-2 text-xs"
+                            onClick={() => handleDeletePatient(patient.id)}
+                            disabled={deletingId === patient.id}
+                          >
+                            {deletingId === patient.id ? 'Suppression...' : 'Supprimer'}
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -227,6 +319,77 @@ export const AdminPatients = () => {
           </>
         )}
       </div>
+
+      {selectedPatient && (
+        <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 mt-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+            <div>
+              <h3 className="text-xl font-semibold text-[#0A2540]">Details patient</h3>
+              <p className="text-sm text-[#64748B]">{selectedPatient.name}</p>
+            </div>
+            <Button variant="outline" className="px-4 py-2" onClick={() => setEditMode((prev) => !prev)}>
+              {editMode ? 'Annuler' : 'Modifier'}
+            </Button>
+          </div>
+
+          {editMode ? (
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-[#0A2540]">Nom complet</label>
+                <input
+                  type="text"
+                  className="input-santia"
+                  value={editForm.name}
+                  onChange={(event) => handleEditChange('name', event.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-[#0A2540]">Email</label>
+                <input
+                  type="email"
+                  className="input-santia"
+                  value={editForm.email}
+                  onChange={(event) => handleEditChange('email', event.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-[#0A2540]">Telephone</label>
+                <input
+                  type="text"
+                  className="input-santia"
+                  value={editForm.phone}
+                  onChange={(event) => handleEditChange('phone', event.target.value)}
+                />
+              </div>
+              <div className="md:col-span-2 flex flex-wrap gap-3">
+                <Button
+                  className="btn-green px-6 py-3"
+                  onClick={handleUpdatePatient}
+                  disabled={savingId === selectedPatient.id}
+                >
+                  {savingId === selectedPatient.id ? 'Sauvegarde...' : 'Enregistrer'}
+                </Button>
+                <Button variant="outline" className="px-6 py-3" onClick={() => setEditMode(false)}>
+                  Annuler
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 gap-4 text-sm text-[#64748B]">
+              <div>
+                <p className="text-xs uppercase text-[#94A3B8] mb-1">Contact</p>
+                <p className="font-semibold text-[#0A2540]">{selectedPatient.email}</p>
+                <p>{selectedPatient.phone}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase text-[#94A3B8] mb-1">Compte</p>
+                <p>Inscrit le {formatDateTime(selectedPatient.created_at)}</p>
+                <p>{selectedPatient.openim_user_id ? 'OpenIM actif' : 'OpenIM non lie'}</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </AdminLayout>
   );
 };
