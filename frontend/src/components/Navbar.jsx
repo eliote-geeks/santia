@@ -74,7 +74,7 @@ export const Navbar = () => {
             <Link to="/" className="flex items-center" data-testid="navbar-logo">
               <div className="bg-[#0A2540] rounded-2xl h-16 w-24 flex items-center justify-center">
                 <img
-                  src="/images/logo_rm_transparent.png"
+                  src="/images/logo_santia.png"
                   alt="Santia Logo"
                   className="h-12 md:h-14 w-auto"
                 />

@@ -37,7 +37,10 @@ const API_URL = process.env.REACT_APP_BACKEND_URL;
 const MEETING_BASE_URL = (process.env.REACT_APP_JITSI_URL || 'https://meet.jit.si').replace(/\/$/, '');
 const STANDARD_PAYMENT_AMOUNT = 5000;
 const EXPRESS_PAYMENT_AMOUNT = 8000;
-const DEPOSIT_NUMBER = '657817198';
+const DEPOSIT_ACCOUNTS = [
+  { id: 'orange-money', label: 'Orange Money', number: '657817198', accent: '#FF7900' },
+  { id: 'mtn-momo', label: 'MTN MoMo', number: '675458897', accent: '#FFCB05' }
+];
 const BOOKING_STORAGE_KEY = 'santia_booking';
 
 const categories = [
@@ -236,13 +239,13 @@ export const Consultation = () => {
     }
   };
 
-  const handleCopyDeposit = async () => {
+  const handleCopyDeposit = async (number, label) => {
     try {
-      await navigator.clipboard.writeText(DEPOSIT_NUMBER);
+      await navigator.clipboard.writeText(number);
       setDepositCopied(true);
       toast({
         title: 'Numero copie',
-        description: `Le numero ${DEPOSIT_NUMBER} a ete copie.`,
+        description: `Le numero ${number} (${label}) a ete copie.`,
       });
       setTimeout(() => setDepositCopied(false), 2000);
     } catch (error) {
@@ -924,18 +927,28 @@ export const Consultation = () => {
                   <div className="bg-white border border-slate-200 rounded-2xl p-4">
                     <p className="text-sm font-semibold text-[#0A2540]">Depot Mobile Money</p>
                     <p className="text-xs text-[#64748B] mt-2">
-                      Effectuez le depot sur le numero suivant puis ajoutez la capture de paiement.
+                      Effectuez le depot sur le numero correspondant a votre operateur puis ajoutez la capture de paiement.
                     </p>
-                    <div className="mt-3 flex flex-wrap items-center gap-3">
-                      <p className="text-lg font-bold text-[#0A2540] tracking-wide">{DEPOSIT_NUMBER}</p>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleCopyDeposit}
-                      >
-                        {depositCopied ? 'Copie' : 'Copier le numero'}
-                      </Button>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      {DEPOSIT_ACCOUNTS.map((account) => (
+                        <div
+                          key={account.id}
+                          className="border border-slate-200 rounded-xl p-3 flex items-center justify-between"
+                        >
+                          <div>
+                            <p className="text-xs font-semibold text-[#0A2540]">{account.label}</p>
+                            <p className="text-lg font-bold text-[#0A2540] tracking-wide">{account.number}</p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCopyDeposit(account.number, account.label)}
+                          >
+                            {depositCopied ? 'Copie' : 'Copier'}
+                          </Button>
+                        </div>
+                      ))}
                     </div>
                   </div>
 

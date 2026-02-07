@@ -10,7 +10,7 @@ export const Footer = () => {
           <div className="lg:col-span-1">
             <div className="mb-4">
               <img
-                src="/images/logo_rm_transparent.png"
+                src="/images/logo_santia.png"
                 alt="Santia Logo"
                 className="h-16 w-auto"
               />
