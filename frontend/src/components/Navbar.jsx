@@ -72,7 +72,7 @@ export const Navbar = () => {
               </button>
             )}
             <Link to="/" className="flex items-center" data-testid="navbar-logo">
-              <div className="bg-[#0A2540] rounded-2xl h-16 w-24 flex items-center justify-center">
+              <div className="flex items-center">
                 <img
                   src="/images/logo_santia.png"
                   alt="Santia Logo"
