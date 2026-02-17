@@ -12,8 +12,20 @@ import {
 } from './ui/dropdown-menu';
 
 export const Navbar = () => {
+  const getInitialTheme = () => {
+    if (typeof window === 'undefined') return 'light';
+    try {
+      const stored = localStorage.getItem('santia-theme');
+      if (stored === 'dark' || stored === 'light') return stored;
+    } catch (error) {
+      // ignore
+    }
+    const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+    return prefersDark ? 'dark' : 'light';
+  };
+
   const [isOpen, setIsOpen] = useState(false);
-  const [theme, setTheme] = useState('light');
+  const [theme, setTheme] = useState(getInitialTheme);
   const location = useLocation();
   const navigate = useNavigate();
   const isAuthed = !!getToken();
@@ -37,21 +49,20 @@ export const Navbar = () => {
   const applyTheme = (value) => {
     if (typeof document === 'undefined') return;
     document.documentElement.classList.toggle('dark', value === 'dark');
-    localStorage.setItem('santia-theme', value);
+    try {
+      localStorage.setItem('santia-theme', value);
+    } catch (error) {
+      // ignore
+    }
   };
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const stored = localStorage.getItem('santia-theme');
-    const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
-    const initial = stored === 'dark' || stored === 'light' ? stored : prefersDark ? 'dark' : 'light';
-    setTheme(initial);
-    applyTheme(initial);
-  }, []);
+    applyTheme(theme);
+  }, [theme]);
   const toggleTheme = () => {
-    const next = theme === 'dark' ? 'light' : 'dark';
-    setTheme(next);
-    applyTheme(next);
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
+
+  const logoSrc = theme === 'dark' ? '/images/logo_white_mode.png' : '/images/logo_dark_mode.png';
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 glass-header border-b border-slate-100" data-testid="navbar">
@@ -74,7 +85,7 @@ export const Navbar = () => {
             <Link to="/" className="flex items-center" data-testid="navbar-logo">
               <div className="flex items-center">
                 <img
-                  src="/images/logo_santia.png"
+                  src={logoSrc}
                   alt="Santia Logo"
                   className="h-12 md:h-14 w-auto"
                 />
