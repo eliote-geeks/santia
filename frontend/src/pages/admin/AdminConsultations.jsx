@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
 import { Calendar, ChevronDown, ChevronUp, Clock, ExternalLink, Loader2, MessageSquare, RefreshCw, Wallet } from 'lucide-react';
@@ -89,10 +89,13 @@ export const AdminConsultations = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(8);
   const [query, setQuery] = useState('');
+  const [totalCount, setTotalCount] = useState(0);
+  const [canLoad, setCanLoad] = useState(false);
   const [sortKey, setSortKey] = useState('created_at');
   const [sortDir, setSortDir] = useState('desc');
 
   const handleSort = (key) => {
+    setPage(1);
     if (sortKey === key) {
       setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
     } else {
@@ -114,12 +117,32 @@ export const AdminConsultations = () => {
     </button>
   );
 
-  const loadIntakes = async () => {
+  const loadIntakes = useCallback(async (overrides = {}) => {
+    const nextPage = overrides.page ?? page;
+    const nextPageSize = overrides.pageSize ?? pageSize;
+    const nextQuery = overrides.query ?? query;
+    const nextShowCompleted = overrides.showCompleted ?? showCompleted;
+    const nextSortKey = overrides.sortKey ?? sortKey;
+    const nextSortDir = overrides.sortDir ?? sortDir;
+
     setLoading(true);
     setError('');
     try {
-      const response = await axios.get(`${API_URL}/api/intakes`, { headers: authHeaders() });
-      setIntakes(response.data || []);
+      const response = await axios.get(`${API_URL}/api/intakes/paged`, {
+        headers: authHeaders(),
+        params: {
+          page: nextPage,
+          page_size: nextPageSize,
+          q: nextQuery || undefined,
+          show_completed: nextShowCompleted,
+          sort_key: nextSortKey,
+          sort_dir: nextSortDir,
+        },
+      });
+      const payload = response.data || {};
+      const items = payload.items || [];
+      setIntakes(items);
+      setTotalCount(payload.total || 0);
     } catch (err) {
       if (err.response?.status === 401) {
         setError('Veuillez vous connecter pour acceder a l administration.');
@@ -131,7 +154,7 @@ export const AdminConsultations = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, pageSize, query, showCompleted, sortKey, sortDir]);
 
   const loadDoctors = async () => {
     setDoctorLoading(true);
@@ -154,77 +177,31 @@ export const AdminConsultations = () => {
       setError('Acces reserve a l administration.');
       return;
     }
-    loadIntakes();
+    setCanLoad(true);
     loadDoctors();
   }, [navigate]);
 
-  const filteredIntakes = useMemo(() => {
-    const term = query.trim().toLowerCase();
-    const base = showCompleted ? intakes : intakes.filter((item) => item.status !== 'done');
-    if (!term) return base;
-    return base.filter((item) => {
-      const doctorName = item.assigned_doctor?.name || '';
-      return [
-        item.name,
-        item.email,
-        item.phone,
-        item.city,
-        item.category,
-        doctorName,
-        item.id
-      ]
-        .filter(Boolean)
-        .some((value) => value.toString().toLowerCase().includes(term));
-    });
-  }, [intakes, showCompleted, query]);
-
-  const sortedIntakes = useMemo(() => {
-    const getValue = (item) => {
-      switch (sortKey) {
-        case 'name':
-          return item.name || '';
-        case 'category':
-          return item.category || '';
-        case 'status':
-          return item.status || '';
-        case 'payment_status':
-          return item.payment_status || '';
-        case 'scheduled_at':
-          return item.scheduled_at || '';
-        case 'doctor':
-          return item.assigned_doctor?.name || '';
-        case 'created_at':
-        default:
-          return item.created_at || '';
-      }
-    };
-    return [...filteredIntakes].sort((a, b) => {
-      const aVal = getValue(a);
-      const bVal = getValue(b);
-      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
-      return 0;
-    });
-  }, [filteredIntakes, sortKey, sortDir]);
-
-  const totalPages = Math.max(1, Math.ceil(sortedIntakes.length / pageSize));
-  const paginatedIntakes = sortedIntakes.slice((page - 1) * pageSize, page * pageSize);
-
   useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
+    if (!canLoad) return;
+    loadIntakes();
+  }, [canLoad, loadIntakes]);
 
   useEffect(() => {
     setPage(1);
   }, [query, pageSize, showCompleted]);
 
   useEffect(() => {
-    if (!selectedIntakeId && sortedIntakes.length > 0) {
-      setSelectedIntakeId(sortedIntakes[0].id);
+    if (intakes.length === 0) {
+      setSelectedIntakeId(null);
+      return;
     }
-  }, [sortedIntakes, selectedIntakeId]);
+    if (!selectedIntakeId || !intakes.some((item) => item.id === selectedIntakeId)) {
+      setSelectedIntakeId(intakes[0].id);
+    }
+  }, [intakes, selectedIntakeId]);
 
-  const selectedIntake = sortedIntakes.find((item) => item.id === selectedIntakeId) || null;
+  const selectedIntake = intakes.find((item) => item.id === selectedIntakeId) || null;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
   const handleScheduleChange = (id, value) => {
     setScheduleValues((prev) => ({ ...prev, [id]: value }));
@@ -372,7 +349,7 @@ export const AdminConsultations = () => {
             <Loader2 className="w-4 h-4 animate-spin text-[#2ECC71]" />
             Chargement des demandes...
           </div>
-        ) : sortedIntakes.length === 0 ? (
+        ) : intakes.length === 0 ? (
           <div className="text-sm text-[#64748B]">Aucune demande pour le moment.</div>
         ) : (
           <>
@@ -381,7 +358,7 @@ export const AdminConsultations = () => {
               onQueryChange={setQuery}
               pageSize={pageSize}
               onPageSizeChange={setPageSize}
-              totalCount={sortedIntakes.length}
+              totalCount={totalCount}
               label="demandes"
             />
             <div className="overflow-auto border border-slate-200 rounded-2xl">
@@ -411,7 +388,7 @@ export const AdminConsultations = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedIntakes.map((intake) => {
+                  {intakes.map((intake) => {
                     const consultationType = intake.consultation_type === 'express' ? 'Express' : 'Standard';
                     const paymentStatus = paymentStatusLabel[intake.payment_status] || paymentStatusLabel.pending;
                     const paymentTone = paymentStatusTone[intake.payment_status] || paymentStatusTone.pending;

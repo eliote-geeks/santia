@@ -879,8 +879,8 @@ class DoctorSummary(BaseModel):
     id: str
     name: str
     specialty: str
-    email: EmailStr
-    phone: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
     category: Optional[str] = None
     openemr_provider_id: Optional[str] = None
     openim_user_id: Optional[str] = None
@@ -946,6 +946,12 @@ class ProvisionDoctorsResponse(BaseModel):
     status: str
     message: Optional[str] = None
     csv: Optional[str] = None
+
+class IntakesPageResponse(BaseModel):
+    items: List[IntakeResponse]
+    page: int
+    page_size: int
+    total: int
 
 # Add your routes to the router instead of directly to app
 @api_router.get("/")
@@ -1357,8 +1363,8 @@ def build_doctor_summary(doctor: dict) -> dict:
         "id": doctor.get("id", ""),
         "name": doctor.get("name", ""),
         "specialty": doctor.get("specialty", ""),
-        "email": doctor.get("email", ""),
-        "phone": doctor.get("phone", ""),
+        "email": doctor.get("email"),
+        "phone": doctor.get("phone"),
         "category": doctor.get("category"),
         "openemr_provider_id": doctor.get("openemr_provider_id"),
         "openim_user_id": doctor.get("openim_user_id"),
@@ -1682,6 +1688,9 @@ async def create_intake(input: IntakeCreate, current_user: dict = Depends(get_cu
         except OpenEMRError as exc:
             logger.error("OpenEMR integration failed: %s", exc)
             raise HTTPException(status_code=502, detail="Erreur lors de la creation du dossier patient")
+        except Exception as exc:
+            logger.exception("OpenEMR unexpected error: %s", exc)
+            raise HTTPException(status_code=502, detail="Erreur lors de la creation du dossier patient")
 
     assigned_doctor = None
     requested_doctor_id = (input.requested_doctor_id or "").strip() or None
@@ -1737,7 +1746,11 @@ async def create_intake(input: IntakeCreate, current_user: dict = Depends(get_cu
     }
     
     if db is not None:
-        await db.intakes.insert_one(doc)
+        try:
+            await db.intakes.insert_one(doc)
+        except Exception as exc:
+            logger.exception("Failed to persist intake %s: %s", intake_id, exc)
+            raise HTTPException(status_code=500, detail="Erreur lors de l enregistrement de la consultation")
 
     if assigned_doctor and patient_openim_id and doctor_openim_id and openim_client.can_send_message():
         patient_name = doc.get("name", "Patient")
@@ -1762,12 +1775,18 @@ async def create_intake(input: IntakeCreate, current_user: dict = Depends(get_cu
                 )
         except OpenIMError as exc:
             logger.warning("OpenIM intro message failed: %s", exc)
+        except Exception as exc:
+            logger.warning("OpenIM intro unexpected failure: %s", exc)
     
     # Return without _id
     if "_id" in doc:
         del doc["_id"]
     
-    return IntakeResponse(**doc)
+    try:
+        return IntakeResponse(**doc)
+    except Exception as exc:
+        logger.exception("Failed to serialize intake %s: %s", intake_id, exc)
+        raise HTTPException(status_code=500, detail="Erreur interne lors de la creation de la consultation")
 
 @api_router.get("/intakes", response_model=List[IntakeResponse])
 async def get_intakes(_: dict = Depends(require_admin)):
@@ -1778,6 +1797,63 @@ async def get_intakes(_: dict = Depends(require_admin)):
     for intake in intakes:
         updated.append(await ensure_meeting_url(intake))
     return updated
+
+@api_router.get("/intakes/paged", response_model=IntakesPageResponse)
+async def get_intakes_paged(
+    page: int = 1,
+    page_size: int = 20,
+    q: Optional[str] = None,
+    show_completed: bool = False,
+    sort_key: str = "created_at",
+    sort_dir: Literal["asc", "desc"] = "desc",
+    _: dict = Depends(require_admin),
+):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Base de donnees indisponible")
+
+    page = max(1, page)
+    page_size = min(100, max(1, page_size))
+    query: dict = {}
+    if not show_completed:
+        query["status"] = {"$ne": "done"}
+
+    if q and q.strip():
+        needle = re.escape(q.strip())
+        regex = {"$regex": needle, "$options": "i"}
+        query["$or"] = [
+            {"id": regex},
+            {"name": regex},
+            {"email": regex},
+            {"phone": regex},
+            {"city": regex},
+            {"category": regex},
+            {"assigned_doctor.name": regex},
+        ]
+
+    sort_map = {
+        "created_at": "created_at",
+        "name": "name",
+        "category": "category",
+        "status": "status",
+        "payment_status": "payment_status",
+        "scheduled_at": "scheduled_at",
+        "doctor": "assigned_doctor.name",
+    }
+    sort_field = sort_map.get(sort_key, "created_at")
+    sort_order = 1 if sort_dir == "asc" else -1
+
+    total = await db.intakes.count_documents(query)
+    cursor = (
+        db.intakes.find(query, {"_id": 0})
+        .sort(sort_field, sort_order)
+        .skip((page - 1) * page_size)
+        .limit(page_size)
+    )
+    items = await cursor.to_list(page_size)
+    updated = []
+    for intake in items:
+        updated.append(await ensure_meeting_url(intake))
+    return IntakesPageResponse(items=updated, page=page, page_size=page_size, total=total)
 
 @api_router.get("/intakes/me", response_model=List[IntakeResponse])
 async def get_my_intakes(current_user: dict = Depends(get_current_user)):
@@ -1792,6 +1868,55 @@ async def get_my_intakes(current_user: dict = Depends(get_current_user)):
     for intake in intakes:
         updated.append(await ensure_meeting_url(intake))
     return updated
+
+@api_router.get("/intakes/me/paged", response_model=IntakesPageResponse)
+async def get_my_intakes_paged(
+    page: int = 1,
+    page_size: int = 20,
+    q: Optional[str] = None,
+    sort_key: str = "created_at",
+    sort_dir: Literal["asc", "desc"] = "desc",
+    current_user: dict = Depends(get_current_user),
+):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Base de donnees indisponible")
+    page = max(1, page)
+    page_size = min(100, max(1, page_size))
+
+    query: dict = {"user_id": current_user.get("id")}
+    if q and q.strip():
+        needle = re.escape(q.strip())
+        regex = {"$regex": needle, "$options": "i"}
+        query["$or"] = [
+            {"id": regex},
+            {"category": regex},
+            {"status": regex},
+            {"payment_status": regex},
+            {"assigned_doctor.name": regex},
+        ]
+
+    sort_map = {
+        "created_at": "created_at",
+        "category": "category",
+        "status": "status",
+        "payment_status": "payment_status",
+        "scheduled_at": "scheduled_at",
+    }
+    sort_field = sort_map.get(sort_key, "created_at")
+    sort_order = 1 if sort_dir == "asc" else -1
+
+    total = await db.intakes.count_documents(query)
+    items = (
+        await db.intakes.find(query, {"_id": 0})
+        .sort(sort_field, sort_order)
+        .skip((page - 1) * page_size)
+        .limit(page_size)
+        .to_list(page_size)
+    )
+    updated = []
+    for intake in items:
+        updated.append(await ensure_meeting_url(intake))
+    return IntakesPageResponse(items=updated, page=page, page_size=page_size, total=total)
 
 @api_router.get("/intakes/{intake_id}", response_model=IntakeResponse)
 async def get_intake(intake_id: str, current_user: dict = Depends(get_current_user)):

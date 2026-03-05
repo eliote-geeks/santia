@@ -4,6 +4,7 @@ import axios from 'axios';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { Button } from '../components/ui/button';
+import { Pagination } from '../components/Pagination';
 import { authHeaders, getToken } from '../lib/auth';
 import {
   Calendar,
@@ -90,6 +91,9 @@ export const PatientProfile = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(6);
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
     const fetchIntake = async () => {
@@ -102,9 +106,19 @@ export const PatientProfile = () => {
           const response = await axios.get(`${API_URL}/api/intakes/${id}`, { headers: authHeaders() });
           setIntake(response.data);
         } else {
-          const response = await axios.get(`${API_URL}/api/intakes/me`, { headers: authHeaders() });
-          const items = response.data || [];
+          const response = await axios.get(`${API_URL}/api/intakes/me/paged`, {
+            headers: authHeaders(),
+            params: {
+              page,
+              page_size: pageSize,
+              sort_key: 'created_at',
+              sort_dir: 'desc',
+            },
+          });
+          const payload = response.data || {};
+          const items = payload.items || [];
           setIntakes(items);
+          setTotalCount(payload.total || 0);
         }
       } catch (err) {
         if (err.response?.status === 401) {
@@ -118,7 +132,7 @@ export const PatientProfile = () => {
     };
 
     fetchIntake();
-  }, [id, navigate, location.pathname]);
+  }, [id, navigate, location.pathname, page, pageSize]);
 
   const handleCopy = async () => {
     if (!intake?.meeting_url) return;
@@ -174,6 +188,7 @@ export const PatientProfile = () => {
   ]) : [];
 
   const pageTitle = isDetailView ? 'Suivi de votre consultation' : 'Mes consultations';
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
   return (
     <div className="min-h-screen bg-[#F8FAFC]" data-testid="patient-profile-page">
@@ -269,6 +284,7 @@ export const PatientProfile = () => {
                     </div>
                   );
                 })}
+                <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
               </div>
             )
           )}
