@@ -4,6 +4,7 @@ Patient intake UI + API with OpenEMR integration.
 
 ## Documentation
 - User guide: `docs/USER_GUIDE.md`
+- Full project + deployment guide: `docs/GUIDE_COMPLET_PROJET_ET_DEPLOIEMENT.md`
 
 ## Local setup
 
